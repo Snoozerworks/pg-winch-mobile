@@ -1,0 +1,159 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:custom="http://schemas.android.com/apk/res/skarmflyg.org.gohigh"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/LinearLayout1"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical" >
+
+    <skarmflyg.org.gohigh.widgets.Meter
+        android:id="@+id/meter1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        custom:needle_max_ang="120"
+        custom:needle_max_val="896"
+        custom:needle_min_ang="-120"
+        custom:needle_min_val="128"
+        custom:num_format="%3.0f"
+        custom:rate_limit="512"
+        custom:raw_hi="896"
+        custom:raw_lo="128"
+        custom:val_hi="110"
+        custom:val_lo="30"
+        custom:wrn_hi="896"
+        custom:wrn_lo="128" />
+
+    <TableLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal" >
+
+        <TableRow
+            android:id="@+id/tableRow1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="3dp" >
+
+            <skarmflyg.org.gohigh.widgets.Digits
+                android:id="@+id/temperature"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="3dp"
+                android:layout_marginRight="3dp"
+                custom:num_format="%3.1f"
+                custom:rate_limit="256"
+                custom:raw_hi="1023"
+                custom:raw_lo="0"
+                custom:val_hi="1023"
+                custom:val_lo="0"
+                custom:wrn_hi="896"
+                custom:wrn_lo="255" />
+
+            <skarmflyg.org.gohigh.widgets.Digits
+                android:id="@+id/drum_spd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="3dp"
+                android:layout_marginRight="3dp"
+                custom:num_format="%3.0f"
+                custom:rate_limit="50"
+                custom:raw_hi="255"
+                custom:raw_lo="0"
+                custom:val_hi="255"
+                custom:val_lo="0"
+                custom:wrn_hi="60"
+                custom:wrn_lo="5" />
+
+            <skarmflyg.org.gohigh.widgets.Digits
+                android:id="@+id/pump_spd"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="3dp"
+                android:layout_marginRight="3dp"
+                custom:num_format="%3.0f"
+                custom:rate_limit="50"
+                custom:raw_hi="255"
+                custom:raw_lo="0"
+                custom:val_hi="255"
+                custom:val_lo="0"
+                custom:wrn_hi="60"
+                custom:wrn_lo="5" />
+
+        </TableRow>
+
+        <TableRow
+            android:id="@+id/tableRow2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" >
+
+            <ImageView
+                android:id="@+id/imageView1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/custom_temp_icon" />
+
+            <ImageView
+                android:id="@+id/imageView2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/custom_drum_icon" />
+
+            <ImageView
+                android:id="@+id/imageView3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/custom_pump_icon" />
+        </TableRow>
+    </TableLayout>
+
+    <ScrollView
+        android:id="@+id/sv_log"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1" >
+
+        <TextView
+            android:id="@+id/txt_log"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:text="Anslut tilll vinchen."
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:typeface="monospace" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="0" >
+
+        <Button
+            android:id="@+id/btn_connect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_connect" />
+
+        <Button
+            android:id="@+id/btn_go_sample"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_go_sample"
+            android:visibility="invisible" />
+
+        <Button
+            android:id="@+id/btn_op_load"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_op_load"
+            android:visibility="invisible" />
+
+        <Button
+            android:id="@+id/btn_settings_act"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_settings_act"
+            android:visibility="invisible" />
+
+    </LinearLayout>
+
+</LinearLayout>

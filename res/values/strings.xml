@@ -1,0 +1,39 @@
+<resources>
+
+    <string name="app_name">GoHigh</string>
+    <string name="menu_settings">Settings</string>
+    <string name="title_activity_connect">Connect</string>
+    <string name="btn_connect">Anslut</string>
+    <string name="btn_disconnect">Koppla från</string><string name="btn_set">Nästa</string>
+    <string name="btn_up">Öka</string>
+    <string name="btn_down">Minska</string>
+    <string name="btn_op_settings">Inställningar</string>
+    <string name="btn_op_load">Synca</string>
+    <string name="btn_go_sample">Status</string>
+    <string name="btservice_started">BT-service startad</string>
+    <string name="btservice_stopped">BT-service stoppad</string>
+    <string name="btservice_label">Uppkoppling vinsch via blåtand.</string>
+    <string name="btservice_connected">BT-service ansluten</string>
+    <string name="btservice_disconnected">BT-service frånkopplad</string>
+    <string name="title_activity_service_note">ServiceNote</string>
+    <string name="meter_scale">Meter scale</string>
+    <string name="btn_settings_act">Parametrar</string>
+
+    <string-array name="modes">
+        <item>Av</item>
+        <item>Uppstart</item>
+        <item>Installation</item>
+        <item>Inställningar</item>
+        <item>Vänteläge</item>
+        <item>Dragläge</item>
+    </string-array>
+    
+    
+    <string name="bt_not_supported">Bluetooth not supported</string>
+    <string name="bt_disabled">Bluetooth disabled</string>
+    <string name="bt_connected">Blåtand ansluten.</string>
+    <string name="bt_disconnected">Blåtand frånkopplad.</string>
+    <string name="parameter_act">Inställningar för vinsch</string>
+    
+
+</resources>
