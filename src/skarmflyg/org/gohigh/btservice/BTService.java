@@ -1,5 +1,5 @@
-package skarmflyg.org.gohigh.btservice;
 
+package skarmflyg.org.gohigh.btservice;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -30,12 +30,9 @@ import android.os.Message;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.widget.Toast;
-//import android.os.Messenger;
-//import android.os.RemoteException;
 
 public class BTService extends Service {
-
-	// Bluetooth stuff
+    // Bluetooth stuff
 	// static private final String BT_MAC = "00:06:66:43:11:8D"; // <-- *** Change MAC-address here! ***
 	static private final String BT_MAC = "00:06:66:43:07:C0"; // <-- *** Change MAC-address here! ***
 	static private BluetoothSocket bt_socket;
@@ -45,6 +42,8 @@ public class BTService extends Service {
 	static private final UUID BT_SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 	static private BTThreadHandler bt_thread_handler;
 
+	
+	
 	private final HandlerThread bt_thread = new HandlerThread(BT_THREAD_NAME);
 
 	static private final BluetoothAdapter bt_adapter = BluetoothAdapter.getDefaultAdapter();
@@ -325,10 +324,13 @@ public class BTService extends Service {
 	}
 
 	static class BTThreadHandler extends Handler {
-		enum WORK_MODES {
-			OFFLINE, ONLINE_STANDBY, ONLINE_WORKING
+//		enum WORK_MODES {
+//		OFFLINE, ONLINE_STANDBY, ONLINE_WORKING
+//	};
+		enum MODES {
+			OFFLINE, ONLINE_STANDBY, ONLINE_GET_SAMPLES, ONLINE_GET_PARAMS
 		};
-
+		static protected MODES mode = MODES.OFFLINE; // Mode of operation for activity
 		static private byte[] btRxBuffer;
 		static private int bytesRead = 0;
 		static private int bytesToRead = 0;
@@ -348,18 +350,29 @@ public class BTService extends Service {
 
 
 		/**
-		 * Handle messages to the thread. A MSG_BT_PACKAGE_REQUEST will result in a new request to the winch unless
-		 * there is any ongoing transactions. If a previous request hasn't been successfully finished or timed out, the
-		 * request will silently be ignored. A new request message MSG_BT_PACKAGE_REQUEST shall have message.obj set to
-		 * the command to send and message.arg1 the timeout in milliseconds to use.
+		 * Handle messages to the thread. 
+		 * 
+		 * BtServiceCommand given in msg.what can be 
+		 * - DISCONNECT		: Close streams and bluetooth socket. 
+		 * - GET_PARAMETER	: Send a single SET command. 
+		 * - GET_PARAMETERS	: Send a SET command and a new SET after each sample received.
+		 * - SET			: See GET_PARAMETER.
+		 * - GET_SAMPLE		: Send a single GET command.
+		 * - GET_SAMPLES	: Send a GET command and a new GET after each sample received.
+		 * - KILL			: Close streams and bluetooth socket. Interrupt thread.
+		 * - TIMEOUT		: Used from inside thread to issue a timeout.
+		 * 
+		 * The timeout in milliseconds should be specified in msg.arg1. All messages with commands except DICONNECT,
+		 * KILL and TIMEOUT will be ignored until a sample or parameter has been successfully received or there was a 
+		 * time out. 
 		 * 
 		 * @param msg
-		 *            Message with attribute obj being the command and attribute arg1 the timeout.
-		 */
+		 *            Message where msg.obj=BtServiceCommand and msg.arg1=timeout.            
+		 */		
 		public void handleMessage(Message msg) {
 			BtServiceCommand msg_command = BtServiceCommand.get(msg.what);
 			Mode winchMode = Mode.NOMODE;
-			Command cmd = Command.NOCMD;
+			Command winschCmd = Command.NOCMD;
 			int timeout;
 
 			if (Thread.currentThread().isInterrupted()) {
@@ -398,40 +411,42 @@ public class BTService extends Service {
 				timeout = msg.arg1;
 
 				switch (msg_command) {
-				case GET_PARAMETER:
 				case SET:
+				case GET_PARAMETER:
 				case GET_PARAMETERS:
-					cmd = Command.SET;
-					bytesToRead = Parameter.BYTE_SIZE; // Assume bytes for parameter as a start.
+					winschCmd = Command.SET;
+					bytesToRead = Parameter.BYTE_SIZE; // Assume a parameter in response.
 					break;
-				case GET_SAMPLES:
 				case GET_SAMPLE:
-					cmd = Command.GET;
-					bytesToRead = Sample.BYTE_SIZE; // Assume bytes for sample as a start.
+				case GET_SAMPLES:
+					winschCmd = Command.GET;
+					bytesToRead = Sample.BYTE_SIZE; // Assume a sample in response.
 					break;
 				case DOWN:
-					cmd = Command.DOWN;
-					bytesToRead = Parameter.BYTE_SIZE; // Assume bytes for parameter as a start.
+					winschCmd = Command.DOWN;
+					bytesToRead = Parameter.BYTE_SIZE; // Assume a parameter in response.
 					break;
 				case UP:
-					cmd = Command.UP;
-					bytesToRead = Parameter.BYTE_SIZE; // Assume bytes for parameter as a start.
+					winschCmd = Command.UP;
+					bytesToRead = Parameter.BYTE_SIZE; // Assume a parameter in response.
 					break;
 				default:
-					cmd = Command.NOCMD;
+					winschCmd = Command.NOCMD;
 					return;
 				}
 
 				// Send command and set a timeout
-				Log.i(this.getClass().getSimpleName(), "Send command: " + cmd.toString());
+				Log.i(this.getClass().getSimpleName(), "Send command: " + winschCmd.toString());
 				this.sendEmptyMessageDelayed(BtServiceResponse.PACKAGE_TIMEOUT.Value(), timeout);
-				btWrite(cmd.getByte());
+				btWrite(winschCmd.getByte());
 
-				// Check for response
-				handleMessage(null);
+				// Check for response since bytesRead != bytesToRead.
+				//handleMessage(null);
 
-			} else if (bytesRead == bytesToRead) {
-				// Done. All requested bytes received.
+			} 
+			
+			if (bytesRead == bytesToRead) {
+				// Done. All requested bytes received. Respond to client.
 				bytesToRead = 0;
 				this.removeCallbacksAndMessages(null);
 				byte[] bytes = Arrays.copyOf(btRxBuffer, bytesRead);
@@ -458,7 +473,7 @@ public class BTService extends Service {
 				}
 				btRead();
 
-				// Check for response
+				// Check for response.
 				handleMessage(null);
 			}
 
