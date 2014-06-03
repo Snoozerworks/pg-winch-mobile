@@ -1,7 +1,6 @@
 package skarmflyg.org.gohigh;
 
 import skarmflyg.org.gohigh.R.id;
-import skarmflyg.org.gohigh.arduino.Command;
 import skarmflyg.org.gohigh.arduino.ParameterSet;
 import skarmflyg.org.gohigh.btservice.BTService;
 import skarmflyg.org.gohigh.btservice.BtServiceCommand;
