@@ -28,7 +28,13 @@ public enum BtServiceCommand {
 	}
 
 
-	// This method can be used for reverse lookup purpose
+	/**
+	 * Lookup command given its value v. Returns null if v doesn't exist.
+	 * 
+	 * @param v
+	 *            Command value
+	 * @return Command or null of not found
+	 */
 	static public BtServiceCommand get(int v) {
 		return lookup.get(v);
 	}

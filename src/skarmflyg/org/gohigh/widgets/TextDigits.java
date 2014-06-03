@@ -8,7 +8,6 @@ import android.content.res.TypedArray;
 import android.util.AttributeSet;
 import android.widget.TextView;
 
-
 public class TextDigits extends TextView {
 	private float current_raw = 0;
 
@@ -46,7 +45,8 @@ public class TextDigits extends TextView {
 
 	private void init(AttributeSet attrs, int defStyle) {
 		// Load attributes
-		final TypedArray a = getContext().obtainStyledAttributes(attrs, R.styleable.Digits, defStyle, 0);
+		final TypedArray a = getContext().obtainStyledAttributes(attrs, R.styleable.Digits,
+				defStyle, 0);
 
 		rate_limit = a.getFloat(R.styleable.Digits_rate_limit, rate_limit);
 		raw_hi = a.getFloat(R.styleable.Digits_raw_hi, raw_hi);
@@ -61,7 +61,8 @@ public class TextDigits extends TextView {
 
 	public void attachParam(Parameter p) {
 		parameter = p;
-		if (parameter == null) return;
+		if (parameter == null)
+			return;
 
 		raw_hi = parameter.high;
 		raw_lo = parameter.low;

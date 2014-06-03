@@ -15,7 +15,6 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.widget.ImageView;
 
-
 public class Meter extends ImageView {
 	public final int REFRESH_INTERVALL = 100;
 
@@ -64,18 +63,19 @@ public class Meter extends ImageView {
 				a.getInt(R.styleable.Meter_raw_hi, 1023), //
 				a.getFloat(R.styleable.Meter_val_lo, 0), //
 				a.getFloat(R.styleable.Meter_val_hi, 120));
-		mapping.setChangeRate(a.getFloat(R.styleable.Meter_rate_limit, Float.MAX_VALUE) * REFRESH_INTERVALL / 1000);
+		mapping.setChangeRate(a.getFloat(R.styleable.Meter_rate_limit, Float.MAX_VALUE)
+				* REFRESH_INTERVALL / 1000);
 		mapping.setLowWarning(a.getInt(R.styleable.Meter_wrn_lo, 0));
 		mapping.setHighWarning(a.getInt(R.styleable.Meter_wrn_hi, 1023));
 		mapping.format = a.getString(R.styleable.Meter_num_format);
-		
 
 		map_angle = new SensorMapping( //
 				a.getInt(R.styleable.Meter_needle_min_val, 128), //
 				a.getInt(R.styleable.Meter_needle_max_val, 896), //
 				a.getFloat(R.styleable.Meter_needle_min_ang, -120), //
 				a.getFloat(R.styleable.Meter_needle_max_ang, 120));
-		map_angle.setChangeRate(a.getFloat(R.styleable.Meter_rate_limit, Float.MAX_VALUE) * REFRESH_INTERVALL / 1000);
+		map_angle.setChangeRate(a.getFloat(R.styleable.Meter_rate_limit, Float.MAX_VALUE)
+				* REFRESH_INTERVALL / 1000);
 
 		scale_bmp = BitmapFactory.decodeResource(getResources(), R.drawable.custom_meter_bg);
 		needle_bmp = BitmapFactory.decodeResource(getResources(), R.drawable.custom_needle);
@@ -125,7 +125,8 @@ public class Meter extends ImageView {
 		int sw = MeasureSpec.getSize(widthMeasureSpec);
 
 		canvas_scale = Math.min((float) sw / bw, (float) sh / bh);
-		float s2 = Math.min((float) getSuggestedMinimumWidth() / bw, (float) getSuggestedMinimumHeight() / bh);
+		float s2 = Math.min((float) getSuggestedMinimumWidth() / bw,
+				(float) getSuggestedMinimumHeight() / bh);
 
 		canvas_scale = Math.max(canvas_scale, s2);
 		canvas_scale = Math.min(canvas_scale, 1);

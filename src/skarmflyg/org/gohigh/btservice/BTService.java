@@ -1,15 +1,13 @@
-
 package skarmflyg.org.gohigh.btservice;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.UUID;
-
 import skarmflyg.org.gohigh.ConnectAct;
 import skarmflyg.org.gohigh.R;
 import skarmflyg.org.gohigh.arduino.Command;
-import skarmflyg.org.gohigh.arduino.Mode;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
 import android.app.NotificationManager;
@@ -32,9 +30,12 @@ import android.util.Log;
 import android.widget.Toast;
 
 public class BTService extends Service {
-    // Bluetooth stuff
-	// static private final String BT_MAC = "00:06:66:43:11:8D"; // <-- *** Change MAC-address here! ***
-	static private final String BT_MAC = "00:06:66:43:07:C0"; // <-- *** Change MAC-address here! ***
+	// Bluetooth stuff
+	// static private final String BT_MAC = "00:06:66:43:11:8D"; // <-- ***
+	// Change MAC-address here! ***
+	static private final String BT_MAC = "00:06:66:43:07:C0"; // <-- *** Change
+																// MAC-address
+																// here! ***
 	static private BluetoothSocket bt_socket;
 	static private InputStream bt_instream;
 	static private OutputStream bt_outstream;
@@ -42,8 +43,6 @@ public class BTService extends Service {
 	static private final UUID BT_SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 	static private BTThreadHandler bt_thread_handler;
 
-	
-	
 	private final HandlerThread bt_thread = new HandlerThread(BT_THREAD_NAME);
 
 	static private final BluetoothAdapter bt_adapter = BluetoothAdapter.getDefaultAdapter();
@@ -52,16 +51,27 @@ public class BTService extends Service {
 	private NotificationManager mNM;
 	static private Handler clientHandler;
 
-	// Unique Identification Number for the Notification. We use it on Notification start, and to cancel it.
+	// Unique Identification Number for the Notification. We use it on
+	// Notification start, and to cancel it.
 	private int NOTIFICATION = R.string.btservice_started;
+
+
+	/**
+	 * Short for Log.i(this.getClass().getSimpleName(), s)
+	 * 
+	 * @param s
+	 */
+	private void logInfo(String s) {
+		Log.i(this.getClass().getSimpleName(), s);
+	}
 
 
 	@Override
 	public void onCreate() {
-		Log.i(this.getClass().getSimpleName(), "onCreate");
-
+		logInfo("onCreate");
 		registerReceiver(broadcast_receiver, new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED));
-		registerReceiver(broadcast_receiver, new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED));
+		registerReceiver(broadcast_receiver, new IntentFilter(
+				BluetoothDevice.ACTION_ACL_DISCONNECTED));
 
 		if (!bt_thread.isAlive()) {
 			bt_thread.start();
@@ -69,7 +79,8 @@ public class BTService extends Service {
 
 		bt_thread_handler = new BTThreadHandler(bt_thread.getLooper());
 
-		// Display a notification about us starting. We put an icon in the status bar.
+		// Display a notification about us starting. We put an icon in the
+		// status bar.
 		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 		mNM.notify(NOTIFICATION, getNotification().build());
 	}
@@ -77,7 +88,7 @@ public class BTService extends Service {
 
 	@Override
 	public void onDestroy() {
-		Log.i(this.getClass().getSimpleName(), "onDestroy");
+		logInfo("onDestroy");
 
 		// Cancel the persistent notification.
 		mNM.cancel(NOTIFICATION);
@@ -100,7 +111,7 @@ public class BTService extends Service {
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		Log.i(this.getClass().getSimpleName(), "onStartCommand. Received start id " + startId + ": " + intent);
+		logInfo("onStartCommand. Received start id " + startId + ": " + intent);
 		// We want this service to continue running until it is explicitly
 		// stopped, so return sticky.
 		return START_STICKY;
@@ -109,14 +120,14 @@ public class BTService extends Service {
 
 	@Override
 	public IBinder onBind(Intent intent) {
-		Log.i(this.getClass().getSimpleName(), "onBind");
+		logInfo("onBind");
 		return new LocalBinder<BTService>(this);
 	}
 
 
 	/**
-	 * Called by client to set a message handler receiving messages from this service. Note that if a handler is already
-	 * set it must be unset calling unsetClientHandler() first.
+	 * Called by client to set a message handler receiving messages from this service. Note that if
+	 * a handler is already set it must be unset calling unsetClientHandler() first.
 	 * 
 	 * @param h
 	 *            Message handler.
@@ -150,8 +161,9 @@ public class BTService extends Service {
 	}
 
 	/**
-	 * Broadcast receiver used to listen for when the bluetooth connects and disconnects. When the bluetooth is
-	 * connected/disconnected the MSG_BT_CONNECTED/MSG_BT_DISCONNECTED is sent to the client message handler.
+	 * Broadcast receiver used to listen for when the bluetooth connects and disconnects. When the
+	 * bluetooth is connected/disconnected the MSG_BT_CONNECTED/MSG_BT_DISCONNECTED is sent to the
+	 * client message handler.
 	 */
 	private final BroadcastReceiver broadcast_receiver = new BroadcastReceiver() {
 		public void onReceive(Context context, Intent intent) {
@@ -159,12 +171,14 @@ public class BTService extends Service {
 
 			if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
 				// is_connected = true;
-				mNM.notify(NOTIFICATION, getNotification().setContentText(getText(R.string.bt_connected)).build());
+				mNM.notify(NOTIFICATION,
+						getNotification().setContentText(getText(R.string.bt_connected)).build());
 				SendClientMessage(BtServiceResponse.CONNECTED);
 
 			} else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
 				// is_connected = false;
-				mNM.notify(NOTIFICATION, getNotification().setContentText(getText(R.string.bt_disconnected)).build());
+				mNM.notify(NOTIFICATION,
+						getNotification().setContentText(getText(R.string.bt_disconnected)).build());
 				bt_socket = null;
 				bt_instream = null;
 				bt_outstream = null;
@@ -187,8 +201,10 @@ public class BTService extends Service {
 				.setContentTitle(getText(R.string.app_name)) //
 				.setWhen(System.currentTimeMillis());
 
-		// The PendingIntent to launch our activity if the user selects this notification
-		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, ConnectAct.class), 0);
+		// The PendingIntent to launch our activity if the user selects this
+		// notification
+		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this,
+				ConnectAct.class), 0);
 
 		// Set the info for the views that show in the notification panel.
 		mBuilder.setContentIntent(contentIntent);
@@ -238,9 +254,9 @@ public class BTService extends Service {
 
 
 	/**
-	 * Connect to bluetooth. Enable adapter and select device if necessary. Sends message MSG_BT_CONNECTED to client
-	 * message handler once connected (also when already connected). Sends MSG_ANS_TXT with accompanied text if
-	 * bluetooth is not supported or is not enabled.
+	 * Connect to bluetooth. Enable adapter and select device if necessary. Sends message
+	 * MSG_BT_CONNECTED to client message handler once connected (also when already connected).
+	 * Sends MSG_ANS_TXT with accompanied text if bluetooth is not supported or is not enabled.
 	 * 
 	 * This method setup the bluetooth socket, input stream and output stream.
 	 */
@@ -324,19 +340,12 @@ public class BTService extends Service {
 	}
 
 	static class BTThreadHandler extends Handler {
-//		enum WORK_MODES {
-//		OFFLINE, ONLINE_STANDBY, ONLINE_WORKING
-//	};
-		enum MODES {
-			OFFLINE, ONLINE_STANDBY, ONLINE_GET_SAMPLES, ONLINE_GET_PARAMS
-		};
-		static protected MODES mode = MODES.OFFLINE; // Mode of operation for activity
+
+		private boolean tx_repeat = false; // Flag to get last command sent repeated.
 		static private byte[] btRxBuffer;
 		static private int bytesRead = 0;
 		static private int bytesToRead = 0;
 
-
-		// static private WORK_MODES wrkMode = WORK_MODES.OFFLINE;
 
 		/**
 		 * Constructor
@@ -350,85 +359,95 @@ public class BTService extends Service {
 
 
 		/**
-		 * Handle messages to the thread. 
+		 * Short for Log.i(this.getClass().getSimpleName(), s)
 		 * 
-		 * BtServiceCommand given in msg.what can be 
-		 * - DISCONNECT		: Close streams and bluetooth socket. 
-		 * - GET_PARAMETER	: Send a single SET command. 
-		 * - GET_PARAMETERS	: Send a SET command and a new SET after each sample received.
-		 * - SET			: See GET_PARAMETER.
-		 * - GET_SAMPLE		: Send a single GET command.
-		 * - GET_SAMPLES	: Send a GET command and a new GET after each sample received.
-		 * - KILL			: Close streams and bluetooth socket. Interrupt thread.
-		 * - TIMEOUT		: Used from inside thread to issue a timeout.
+		 * @param s
+		 */
+		private void logInfo(String s) {
+			logInfo(s);
+		}
+
+
+		/**
+		 * Handle messages to the thread.
 		 * 
-		 * The timeout in milliseconds should be specified in msg.arg1. All messages with commands except DICONNECT,
-		 * KILL and TIMEOUT will be ignored until a sample or parameter has been successfully received or there was a 
-		 * time out. 
+		 * BtServiceCommand given in msg.what can be
+		 * <ul>
+		 * <li>DISCONNECT : Close streams and bluetooth socket.</li>
+		 * <li>GET_PARAMETER : Send a single SET command.</li>
+		 * <li>GET_PARAMETERS : Send a SET command and a new SET after each sample received.</li>
+		 * <li>SET : See GET_PARAMETER.</li>
+		 * <li>GET_SAMPLE : Send a single GET command.</li>
+		 * <li>GET_SAMPLES : Send a GET command and a new GET after each sample received.</li>
+		 * <li>KILL : Close streams and bluetooth socket. Interrupt thread.</li>
+		 * <li>TIMEOUT : Used from inside thread to issue a timeout.</li>
+		 * </ul>
+		 * 
+		 * The timeout in milliseconds should be specified in msg.arg1. All messages with commands
+		 * except DISCONNECT, KILL and TIMEOUT will be ignored until a sample or parameter has been
+		 * successfully received or there was a time out.
 		 * 
 		 * @param msg
-		 *            Message where msg.obj=BtServiceCommand and msg.arg1=timeout.            
-		 */		
+		 *            Message where msg.obj=BtServiceCommand and msg.arg1=timeout.
+		 */
 		public void handleMessage(Message msg) {
 			BtServiceCommand msg_command = BtServiceCommand.get(msg.what);
-			Mode winchMode = Mode.NOMODE;
+			// Mode winchMode = Mode.NOMODE;
 			Command winschCmd = Command.NOCMD;
 			int timeout;
 
 			if (Thread.currentThread().isInterrupted()) {
+				resetConnection();
 				return;
 			}
 
-			switch (msg_command) {
-			case DISCONNECT:
+			if (msg_command == BtServiceCommand.DISCONNECT) {
 				resetConnection();
 				return;
+			}
 
-			case KILL:
+			if (msg_command == BtServiceCommand.KILL) {
 				resetConnection();
 				Thread.currentThread().interrupt();
 				return;
+			}
 
-			case TIMEOUT:
-				Log.i(this.getClass().getSimpleName(), "Package timeout. ");
-
-				// Reset number of bytes to wait for
+			if (msg_command == BtServiceCommand.TIMEOUT) {
+				// Reset number of bytes to wait for. Clean message queue from pending requests and
+				// timeouts.
+				logInfo("Package timeout. ");
 				bytesToRead = 0;
-
-				// Clean message queue from pending requests and other timeouts
 				this.removeCallbacksAndMessages(null);
-
-				// Send message to client
 				SendClientMessage(BtServiceResponse.PACKAGE_TIMEOUT);
 				return;
-			default:
-				break;
+			}
+
+			if (msg_command != null) {
+				// Reset tx_repeat if receiving a new command
+				tx_repeat = false;
 			}
 
 			if (bytesToRead == 0) {
 				// No pending transfer. Ready to send a new command with timeout.
-				bytesRead = 0;
+				bytesRead = Sample.BYTE_SIZE; // Least amount of bytes to receive
 				timeout = msg.arg1;
+				tx_repeat = (msg_command == BtServiceCommand.GET_PARAMETERS || msg_command == BtServiceCommand.GET_SAMPLES);
 
 				switch (msg_command) {
 				case SET:
 				case GET_PARAMETER:
 				case GET_PARAMETERS:
 					winschCmd = Command.SET;
-					bytesToRead = Parameter.BYTE_SIZE; // Assume a parameter in response.
 					break;
 				case GET_SAMPLE:
 				case GET_SAMPLES:
 					winschCmd = Command.GET;
-					bytesToRead = Sample.BYTE_SIZE; // Assume a sample in response.
 					break;
 				case DOWN:
 					winschCmd = Command.DOWN;
-					bytesToRead = Parameter.BYTE_SIZE; // Assume a parameter in response.
 					break;
 				case UP:
 					winschCmd = Command.UP;
-					bytesToRead = Parameter.BYTE_SIZE; // Assume a parameter in response.
 					break;
 				default:
 					winschCmd = Command.NOCMD;
@@ -436,35 +455,35 @@ public class BTService extends Service {
 				}
 
 				// Send command and set a timeout
-				Log.i(this.getClass().getSimpleName(), "Send command: " + winschCmd.toString());
+				logInfo("Send command: " + winschCmd.toString());
 				this.sendEmptyMessageDelayed(BtServiceResponse.PACKAGE_TIMEOUT.Value(), timeout);
 				btWrite(winschCmd.getByte());
+			}
 
-				// Check for response since bytesRead != bytesToRead.
-				//handleMessage(null);
-
-			} 
-			
 			if (bytesRead == bytesToRead) {
-				// Done. All requested bytes received. Respond to client.
-				bytesToRead = 0;
+				// All requested bytes received. Remove pending commands and respond to client.
 				this.removeCallbacksAndMessages(null);
 				byte[] bytes = Arrays.copyOf(btRxBuffer, bytesRead);
 
 				if (bytesRead == Sample.BYTE_SIZE) {
-					// A sample received.
-					Log.i(this.getClass().getSimpleName(), "Sample received in mode " + winchMode.toString());
+					logInfo("Sample received.");
 					SendClientMessage(BtServiceResponse.SAMPLE_RECEIVED, bytes);
 				} else if (bytesRead == Parameter.BYTE_SIZE) {
-					// A parameter received.
-					Log.i(this.getClass().getSimpleName(), "Parameter received in mode " + winchMode.toString());
+					logInfo("Parameter received.");
 					SendClientMessage(BtServiceResponse.PARAMETER_RECEIVED, bytes);
 				} else {
-					Log.e(this.getClass().getSimpleName(), "Unknown data received in mode " + winchMode.toString());
+					Log.e(this.getClass().getSimpleName(), "Corrupted data received.");
+				}
+
+				if (tx_repeat) {
+					bytesRead = 0;
+					handleMessage(null);
+				} else {
+					bytesToRead = 0;
 				}
 
 			} else {
-				// More bytes to get... Wait a moment to check for answer.
+				// Wait a while and check for remaining bytes.
 				try {
 					Thread.sleep(40);
 				} catch (InterruptedException e) {
@@ -481,8 +500,8 @@ public class BTService extends Service {
 
 
 		/**
-		 * Reset input and output streams and make sure socket is closed. This method will be used during shutdown() to
-		 * ensure that the connection is properly closed.
+		 * Reset input and output streams and make sure socket is closed. This method will be used
+		 * during shutdown() to ensure that the connection is properly closed.
 		 * 
 		 * @return
 		 */

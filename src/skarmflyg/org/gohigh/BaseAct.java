@@ -33,10 +33,12 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	static private TextView tv_txt_log;
 
 
-	abstract Handler getBtServiceHandler(); // Method shall return a message handler for the bluetooth service.
+	abstract Handler getBtServiceHandler(); // Method shall return a message handler for the
+											// bluetooth service.
 
 
-	abstract TextView getTextView(); // Method shall return a text view which will be used text updates.
+	abstract TextView getTextView(); // Method shall return a text view which will be used text
+										// updates.
 
 
 	// private ServiceConnection bt_service_connection;
@@ -122,7 +124,8 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	/**
 	 * Implements interface of ServiceConnection.
 	 * 
-	 * @see android.content.ServiceConnection#onServiceConnected(android.content.ComponentName, android.os.IBinder)
+	 * @see android.content.ServiceConnection#onServiceConnected(android.content.ComponentName,
+	 *      android.os.IBinder)
 	 */
 	public void onServiceConnected(ComponentName className, IBinder binder) {
 		Log.i(this.getClass().getSimpleName(), "onServiceConnected: " + className.toShortString());

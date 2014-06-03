@@ -12,8 +12,9 @@ public class ParameterSet extends SparseArray<Parameter> {
 	/**
 	 * Check if a parameter with same index exists in set.
 	 * 
-	 * @param p Parameter to check
-	 * @return True if exists. 
+	 * @param p
+	 *            Parameter to check
+	 * @return True if exists.
 	 */
 	public boolean exists(Parameter p) {
 		try {

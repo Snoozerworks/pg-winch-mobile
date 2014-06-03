@@ -86,8 +86,9 @@ public class ParameterAct extends BaseAct {
 				viewEditValue.setText(String.format("%d", (int) param.val_map));
 
 				// String format =
-				// "%s\nLäge.......: %d\nVärde......: %d\nGräns (min,max): (%d,%d)\nMapp (lo,hi): (%d,%d)";
-				// return String.format(format, param.descr, param.mode.toString(), val, low, high, low_map, high_map);
+				// "%s\nLï¿½ge.......: %d\nVï¿½rde......: %d\nGrï¿½ns (min,max): (%d,%d)\nMapp (lo,hi): (%d,%d)";
+				// return String.format(format, param.descr, param.mode.toString(), val, low, high,
+				// low_map, high_map);
 
 				logTxtSet(param.toStringMapped());
 				break;

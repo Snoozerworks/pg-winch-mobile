@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.View.OnClickListener;
 
-
 public class SampleAct extends Activity implements OnClickListener {
 	static private Meter meter;
 	private short pos = 0;
