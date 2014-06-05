@@ -38,9 +38,6 @@ public class ParameterAct extends BaseAct {
 		viewBtnUp.setOnClickListener(onClickUpBtn);
 		viewBtnDown.setOnClickListener(onClickDownBtn);
 
-		// Update button visibility
-		refreshBtnVisibility();
-
 		super.onCreate(savedInstanceState);
 
 	}
@@ -65,22 +62,40 @@ public class ParameterAct extends BaseAct {
 
 	static class ConnHandler extends Handler {
 		public void handleMessage(Message msg) {
+			
+			// TODO Messages from bt service should be passed to BaseAct too... This is ugly. 
+			reported_state = BtServiceResponse.get(msg.what);
+			
 			switch (BtServiceResponse.get(msg.what)) {
-			case CONNECTED:
+			case STATE_SAMPELS:
+			case STATE_SYNCS:
+				viewBtnSet.setVisibility(View.INVISIBLE);
+				viewBtnUp.setVisibility(View.INVISIBLE);
+				viewBtnDown.setVisibility(View.INVISIBLE);
+				break;
+
+			case STATE_STOPPED:
+				viewBtnSet.setVisibility(View.VISIBLE);
+				viewBtnUp.setVisibility(View.VISIBLE);
+				viewBtnDown.setVisibility(View.VISIBLE);
+				break;
+
+			case STATE_CONNECTED:
 				logTxt("Bluetooth uppkopplad.");
-				mode = MODES.ONLINE_STANDBY;
 				break;
-			case DISCONNECTED:
+
+			case STATE_DISCONNECTED:
 				logTxt("Bluetooth nerkopplad.");
-				mode = MODES.OFFLINE;
+				viewBtnSet.setVisibility(View.INVISIBLE);
+				viewBtnUp.setVisibility(View.INVISIBLE);
+				viewBtnDown.setVisibility(View.INVISIBLE);
 				break;
+
 			case PACKAGE_TIMEOUT:
 				logTxtSet("Package timeout.");
-				mode = MODES.ONLINE_STANDBY;
 				break;
 
 			case PARAMETER_RECEIVED:
-				mode = MODES.ONLINE_STANDBY;
 				Parameter param = new Parameter();
 				param.LoadBytes((byte[]) msg.obj);
 				viewEditValue.setText(String.format("%d", (int) param.val_map));
@@ -100,31 +115,10 @@ public class ParameterAct extends BaseAct {
 			case HANDLER_SET:
 			case HANDLER_UNSET:
 			case SAMPLE_RECEIVED:
-			default:
 				break;
 			}
 
-			refreshBtnVisibility();
-
 		};
 	};
-
-
-	static private void refreshBtnVisibility() {
-		switch (mode) {
-		case OFFLINE:
-		case ONLINE_GET_SAMPLES:
-		case ONLINE_GET_PARAMS:
-			viewBtnSet.setVisibility(View.INVISIBLE);
-			viewBtnUp.setVisibility(View.INVISIBLE);
-			viewBtnDown.setVisibility(View.INVISIBLE);
-			break;
-		case ONLINE_STANDBY:
-			viewBtnSet.setVisibility(View.VISIBLE);
-			viewBtnUp.setVisibility(View.VISIBLE);
-			viewBtnDown.setVisibility(View.VISIBLE);
-			break;
-		}
-	}
 
 }

@@ -3,6 +3,7 @@ package skarmflyg.org.gohigh;
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
+import skarmflyg.org.gohigh.btservice.BtServiceCommand;
 import skarmflyg.org.gohigh.btservice.BtServiceResponse;
 import skarmflyg.org.gohigh.widgets.Digits;
 import skarmflyg.org.gohigh.widgets.Meter;
@@ -112,20 +113,48 @@ public class ConnectAct extends BaseAct {
 
 	static class ConnHandler extends Handler {
 		public void handleMessage(Message msg) {
+
+			// TODO Messages from bt service should be passed to BaseAct too... This is ugly.
+			reported_state = BtServiceResponse.get(msg.what);
+
 			switch (BtServiceResponse.get(msg.what)) {
-			case CONNECTED:
+			case STATE_DISCONNECTED:
+				logTxt("Bluetooth nerkopplad.");
+				viewBtnConnect.setText(txtBtnConnect);
+				viewBtnSample.setVisibility(View.INVISIBLE);
+				viewBtnSync.setVisibility(View.INVISIBLE);
+				viewBtnSettingAct.setVisibility(View.INVISIBLE);
+				// mode = MODES.OFFLINE;
+				break;
+
+			case STATE_CONNECTED:
 				logTxt("Bluetooth uppkopplad.");
-				mode = MODES.ONLINE_STANDBY;
+			case STATE_STOPPED:
+				viewBtnSample.setText("Starta log");
+				viewBtnSync.setText("Starta sync");
+				viewBtnConnect.setText(txtBtnDisconnect);
+				viewBtnSample.setVisibility(View.VISIBLE);
+				viewBtnSync.setVisibility(View.VISIBLE);
+				viewBtnSettingAct.setVisibility(View.VISIBLE);
+				break;
+
+			case STATE_SAMPELS:
+				viewBtnSample.setText("Stoppa log");
+				viewBtnSample.setVisibility(View.VISIBLE);
+				viewBtnSync.setVisibility(View.INVISIBLE);
+				viewBtnSettingAct.setVisibility(View.INVISIBLE);
+				break;
+
+			case STATE_SYNCS:
+				viewBtnSync.setText("Stoppa sync");
+				viewBtnSample.setVisibility(View.INVISIBLE);
+				viewBtnSync.setVisibility(View.VISIBLE);
+				viewBtnSettingAct.setVisibility(View.INVISIBLE);
 				break;
 
 			case HANDLER_SET:
 				// mode = (BTService.is_connected) ? MODES.STANDBY : MODES.DISCONNECTED;
 				logTxt(txtBtServiceConnected.toString());
-				break;
-
-			case DISCONNECTED:
-				logTxt("Bluetooth nerkopplad.");
-				mode = MODES.OFFLINE;
 				break;
 
 			case HANDLER_UNSET:
@@ -135,24 +164,21 @@ public class ConnectAct extends BaseAct {
 
 			case PACKAGE_TIMEOUT:
 				logTxt("Package timeout.");
-				mode = MODES.ONLINE_STANDBY;
+				// mode = MODES.ONLINE_STANDBY;
 				break;
 
 			case PARAMETER_RECEIVED:
 				Parameter param = new Parameter();
 				param.LoadBytes((byte[]) msg.obj);
-				logTxtSet(param.toString());
-				parameters.put(param);
-				applyParameters();
+				if (parameters.get(param.index) != null) {
+					stopGetting();					
+					logTxt("Parameters synronized.");
+					applyParameters();
 
-				// if (mode.equals(MODES.ONLINE_GET_PARAMS)) {
-				// if (parameters.exists(param)) {
-				// mode = MODES.ONLINE_STANDBY;
-				// applyParameters();
-				// } else {
-				// getParameter();
-				// }
-				// }
+				} else {
+					logTxtSet(param.toString());
+					parameters.put(param);
+				}
 				break;
 
 			case SAMPLE_RECEIVED:
@@ -163,17 +189,6 @@ public class ConnectAct extends BaseAct {
 				viewTempDigits.setTargetVal(sam.temp);
 				viewDrumDigits.setTargetVal(sam.tach_drum);
 				viewPumpDigits.setTargetVal(sam.tach_pump);
-
-				// if (mode.equals(MODES.ONLINE_GET_SAMPLES)) {
-				// Sample sam = new Sample();
-				// sam.LoadBytes((byte[]) msg.obj);
-				// viewPressureGauge.setTargetVal(sam.pres);
-				// viewTempDigits.setTargetVal(sam.temp);
-				// viewDrumDigits.setTargetVal(sam.tach_drum);
-				// viewPumpDigits.setTargetVal(sam.tach_pump);
-				// getSamples();
-				// logTxtSet(sam.toString());
-				// }
 				break;
 
 			case ANS_TXT:
@@ -184,37 +199,7 @@ public class ConnectAct extends BaseAct {
 				break;
 			}
 
-			refreshBtnVisibility();
-
 		};
-
-
-		static private void refreshBtnVisibility() {
-			switch (mode) {
-			case OFFLINE:
-				viewBtnConnect.setText(txtBtnConnect);
-				viewBtnSample.setVisibility(View.INVISIBLE);
-				viewBtnSync.setVisibility(View.INVISIBLE);
-				viewBtnSettingAct.setVisibility(View.INVISIBLE);
-				break;
-			case ONLINE_GET_SAMPLES:
-				viewBtnSample.setVisibility(View.VISIBLE);
-				viewBtnSync.setVisibility(View.INVISIBLE);
-				viewBtnSettingAct.setVisibility(View.INVISIBLE);
-				break;
-			case ONLINE_STANDBY:
-				viewBtnConnect.setText(txtBtnDisconnect);
-				viewBtnSample.setVisibility(View.VISIBLE);
-				viewBtnSync.setVisibility(View.VISIBLE);
-				viewBtnSettingAct.setVisibility(View.VISIBLE);
-				break;
-			case ONLINE_GET_PARAMS:
-				viewBtnSample.setVisibility(View.INVISIBLE);
-				viewBtnSync.setVisibility(View.VISIBLE);
-				viewBtnSettingAct.setVisibility(View.INVISIBLE);
-				break;
-			}
-		}
 
 	};
 
@@ -244,38 +229,4 @@ public class ConnectAct extends BaseAct {
 
 	}
 
-	// public void onClick(View v) {
-	//
-	// if (v.getId() == id.btn_connect) {
-	// if (BTService.isConnected()) {
-	// btService.BTDisconnect();
-	// } else {
-	// btService.BTConnect();
-	// }
-	// return;
-	// }
-	//
-	// if (!BTService.isConnected())
-	// return;
-	//
-	// switch (v.getId()) {
-	// case id.btn_go_sample:
-	// if (mode.equals(MODES.ONLINE_GET_SAMPLES)) {
-	// mode = MODES.ONLINE_STANDBY;
-	// } else {
-	// getSample();
-	// }
-	// break;
-	//
-	// case id.btn_op_load:
-	// getParameter();
-	// break;
-	//
-	// case id.btn_settings_act:
-	// startActivity(new Intent(this, ParameterAct.class));
-	// break;
-	//
-	// }
-	//
-	// }
 }

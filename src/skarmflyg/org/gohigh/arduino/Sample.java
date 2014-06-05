@@ -17,7 +17,8 @@ public class Sample extends DataPackage {
 
 
 	public void LoadBytes() {
-		mode = Mode.values()[byte2short(raw[0])];
+//		mode = Mode.values()[byte2short(raw[0])];
+		mode = Mode.get((byte) (raw[0] & 0xFF));
 		time = byte2long(raw[1], raw[2], raw[3], raw[4]);
 		tach_pump = byte2short(raw[5]);
 		tach_drum = byte2short(raw[6]);

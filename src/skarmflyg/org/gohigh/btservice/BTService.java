@@ -27,6 +27,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.support.v4.app.NotificationCompat;
 import android.util.Log;
+import android.widget.SlidingDrawer;
 import android.widget.Toast;
 
 public class BTService extends Service {
@@ -145,7 +146,7 @@ public class BTService extends Service {
 
 		SendClientMessage(BtServiceResponse.HANDLER_SET);
 		if (BTService.isConnected()) {
-			SendClientMessage(BtServiceResponse.CONNECTED);
+			SendClientMessage(BtServiceResponse.STATE_CONNECTED);
 		}
 	}
 
@@ -173,7 +174,7 @@ public class BTService extends Service {
 				// is_connected = true;
 				mNM.notify(NOTIFICATION,
 						getNotification().setContentText(getText(R.string.bt_connected)).build());
-				SendClientMessage(BtServiceResponse.CONNECTED);
+				SendClientMessage(BtServiceResponse.STATE_CONNECTED);
 
 			} else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
 				// is_connected = false;
@@ -182,7 +183,7 @@ public class BTService extends Service {
 				bt_socket = null;
 				bt_instream = null;
 				bt_outstream = null;
-				SendClientMessage(BtServiceResponse.DISCONNECTED);
+				SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
 
 			}
 
@@ -262,7 +263,7 @@ public class BTService extends Service {
 	 */
 	public void BTConnect() {
 		if (BTService.isConnected()) {
-			SendClientMessage(BtServiceResponse.CONNECTED);
+			SendClientMessage(BtServiceResponse.STATE_CONNECTED);
 			return;
 		}
 
@@ -318,30 +319,30 @@ public class BTService extends Service {
 
 
 	/**
-	 * Same as calling BTPackageRequest(cmd, 500).
+	 * Send a command to the winch to expect a Sample or Parameter back.
 	 * 
 	 * @param cmd
 	 */
 	public void winchSendCommand(BtServiceCommand cmd) {
-		this.winchSendCommand(cmd, 500);
+		bt_thread_handler.obtainMessage(cmd.Value()).sendToTarget();
 	}
 
-
-	/**
-	 * Send a command, with a timeout, to the winch to expect a Sample or Parameter back.
-	 * 
-	 * @param cmd
-	 *            Command to send; SET, UP, DOWN and GET handled.
-	 * @param timeout
-	 *            Timeout in milliseconds.
-	 */
-	public void winchSendCommand(BtServiceCommand cmd, int timeout) {
-		bt_thread_handler.obtainMessage(cmd.Value(), timeout).sendToTarget();
-	}
+	// /**
+	// * Send a command, with a timeout, to the winch to expect a Sample or Parameter back.
+	// *
+	// * @param cmd
+	// * Command to send; SET, UP, DOWN and GET handled.
+	// * @param timeout
+	// * Timeout in milliseconds.
+	// */
+	// public void winchSendCommand(BtServiceCommand cmd, int timeout) {
+	// bt_thread_handler.obtainMessage(cmd.Value()).sendToTarget();
+	// }
 
 	static class BTThreadHandler extends Handler {
 
-		private boolean tx_repeat = false; // Flag to get last command sent repeated.
+		// private boolean tx_repeat = false; // Flag to get last command sent repeated.
+		private BtServiceCommand tx_repeat; // Flag to get last command sent repeated.
 		static private byte[] btRxBuffer;
 		static private int bytesRead = 0;
 		static private int bytesToRead = 0;
@@ -364,7 +365,7 @@ public class BTService extends Service {
 		 * @param s
 		 */
 		private void logInfo(String s) {
-			logInfo(s);
+			Log.i(this.getClass().getSimpleName(), s);
 		}
 
 
@@ -381,6 +382,7 @@ public class BTService extends Service {
 		 * <li>GET_SAMPLES : Send a GET command and a new GET after each sample received.</li>
 		 * <li>KILL : Close streams and bluetooth socket. Interrupt thread.</li>
 		 * <li>TIMEOUT : Used from inside thread to issue a timeout.</li>
+		 * <li>_RX : Read bytes from input stream.</li>
 		 * </ul>
 		 * 
 		 * The timeout in milliseconds should be specified in msg.arg1. All messages with commands
@@ -391,109 +393,53 @@ public class BTService extends Service {
 		 *            Message where msg.obj=BtServiceCommand and msg.arg1=timeout.
 		 */
 		public void handleMessage(Message msg) {
-			BtServiceCommand msg_command = BtServiceCommand.get(msg.what);
-			// Mode winchMode = Mode.NOMODE;
-			Command winschCmd = Command.NOCMD;
-			int timeout;
-
 			if (Thread.currentThread().isInterrupted()) {
-				resetConnection();
+				onDisconnectCmd();
 				return;
 			}
 
-			if (msg_command == BtServiceCommand.DISCONNECT) {
-				resetConnection();
-				return;
-			}
+			BtServiceCommand msg_command = BtServiceCommand.get(msg.what);
 
-			if (msg_command == BtServiceCommand.KILL) {
-				resetConnection();
+			switch (msg_command) {
+			case KILL:
+				// Interrupt thread and close socket.
 				Thread.currentThread().interrupt();
+			case DISCONNECT:
+				// Close sockets.
+				onDisconnectCmd();
 				return;
-			}
 
-			if (msg_command == BtServiceCommand.TIMEOUT) {
-				// Reset number of bytes to wait for. Clean message queue from pending requests and
-				// timeouts.
-				logInfo("Package timeout. ");
-				bytesToRead = 0;
-				this.removeCallbacksAndMessages(null);
-				SendClientMessage(BtServiceResponse.PACKAGE_TIMEOUT);
+			case TIMEOUT:
+				// Waited too long for data. Stop asking for more data.
+				onTimeoutCmd();
 				return;
+
+			case STOP:
+				// Stop any ongoing transaction of data.
+				onStopCmd();
+				return;
+
+			case GET_STATE:
+				// Send current state to client.
+				onGetStateCmd();
+				return;
+
+			case _RX:
+				// Read data from bluetooth. Respond to client if completed, e.g. if
+				// bytesToRead == bytesRead.
+				onRx();
+				break;
+
+			default:
+				if (bytesToRead == 0) {
+					// No pending transfer. Ready to send a new command with timeout.
+					poll(msg_command);
+				}
 			}
 
-			if (msg_command != null) {
-				// Reset tx_repeat if receiving a new command
-				tx_repeat = false;
-			}
-
-			if (bytesToRead == 0) {
-				// No pending transfer. Ready to send a new command with timeout.
-				bytesRead = Sample.BYTE_SIZE; // Least amount of bytes to receive
-				timeout = msg.arg1;
-				tx_repeat = (msg_command == BtServiceCommand.GET_PARAMETERS || msg_command == BtServiceCommand.GET_SAMPLES);
-
-				switch (msg_command) {
-				case SET:
-				case GET_PARAMETER:
-				case GET_PARAMETERS:
-					winschCmd = Command.SET;
-					break;
-				case GET_SAMPLE:
-				case GET_SAMPLES:
-					winschCmd = Command.GET;
-					break;
-				case DOWN:
-					winschCmd = Command.DOWN;
-					break;
-				case UP:
-					winschCmd = Command.UP;
-					break;
-				default:
-					winschCmd = Command.NOCMD;
-					return;
-				}
-
-				// Send command and set a timeout
-				logInfo("Send command: " + winschCmd.toString());
-				this.sendEmptyMessageDelayed(BtServiceResponse.PACKAGE_TIMEOUT.Value(), timeout);
-				btWrite(winschCmd.getByte());
-			}
-
-			if (bytesRead == bytesToRead) {
-				// All requested bytes received. Remove pending commands and respond to client.
-				this.removeCallbacksAndMessages(null);
-				byte[] bytes = Arrays.copyOf(btRxBuffer, bytesRead);
-
-				if (bytesRead == Sample.BYTE_SIZE) {
-					logInfo("Sample received.");
-					SendClientMessage(BtServiceResponse.SAMPLE_RECEIVED, bytes);
-				} else if (bytesRead == Parameter.BYTE_SIZE) {
-					logInfo("Parameter received.");
-					SendClientMessage(BtServiceResponse.PARAMETER_RECEIVED, bytes);
-				} else {
-					Log.e(this.getClass().getSimpleName(), "Corrupted data received.");
-				}
-
-				if (tx_repeat) {
-					bytesRead = 0;
-					handleMessage(null);
-				} else {
-					bytesToRead = 0;
-				}
-
-			} else {
-				// Wait a while and check for remaining bytes.
-				try {
-					Thread.sleep(40);
-				} catch (InterruptedException e) {
-					resetConnection();
-					return;
-				}
-				btRead();
-
-				// Check for response.
-				handleMessage(null);
+			if (bytesToRead != bytesRead) {
+				// More data to receive.
+				this.sendEmptyMessageDelayed(BtServiceCommand._RX.Value(), 40);
 			}
 
 		}
@@ -505,7 +451,7 @@ public class BTService extends Service {
 		 * 
 		 * @return
 		 */
-		static private void resetConnection() {
+		static private void onDisconnectCmd() {
 			bytesToRead = 0;
 			if (bt_instream != null) {
 				try {
@@ -534,27 +480,154 @@ public class BTService extends Service {
 		}
 
 
+		private void onTimeoutCmd() {
+			logInfo("Package timeout.");
+			bytesToRead = 0;
+			this.removeCallbacksAndMessages(null);
+			SendClientMessage(BtServiceResponse.PACKAGE_TIMEOUT);
+			SendClientMessage(BtServiceResponse.STATE_STOPPED);
+		}
+
+
+		private void onStopCmd() {
+			tx_repeat = null;
+			bytesToRead = 0;
+			this.removeCallbacksAndMessages(null);
+			SendClientMessage(BtServiceResponse.STATE_STOPPED);
+		}
+
+
+		private void onGetStateCmd() {
+			if (bt_socket == null || !bt_socket.isConnected()) {
+				SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
+			} else if (bytesToRead == Sample.BYTE_SIZE) {
+				SendClientMessage(BtServiceResponse.STATE_SAMPELS);
+			} else if (bytesToRead == Parameter.BYTE_SIZE) {
+				SendClientMessage(BtServiceResponse.STATE_SYNCS);
+			} else {
+				SendClientMessage(BtServiceResponse.STATE_STOPPED);
+
+			}
+		}
+
+
+		private void onRx() {
+			if (btRead()) {
+				// Package received. Remove pending commands and respond to client.
+				sendResponse(bytesRead);
+				bytesToRead = 0;
+				this.removeCallbacksAndMessages(null);
+				if (tx_repeat != null) {
+					this.sendEmptyMessage(tx_repeat.Value());
+				}
+			}
+		}
+
+
+		private void poll(BtServiceCommand msg_command) {
+			Command winschCmd = Command.NOCMD;
+			bytesRead = 0;
+			bytesToRead = 0;
+
+			switch (msg_command) {
+			case GET_PARAMETERS:
+				tx_repeat = msg_command;
+			case SET:
+			case GET_PARAMETER:
+				bytesToRead = Parameter.BYTE_SIZE;
+				winschCmd = Command.SET;
+				SendClientMessage(BtServiceResponse.STATE_SYNCS);
+				break;
+
+			case GET_SAMPLES:
+				tx_repeat = msg_command;
+			case GET_SAMPLE:
+				bytesToRead = Sample.BYTE_SIZE;
+				winschCmd = Command.GET;
+				SendClientMessage(BtServiceResponse.STATE_SAMPELS);
+				break;
+
+			case DOWN:
+				winschCmd = Command.DOWN;
+				break;
+
+			case UP:
+				winschCmd = Command.UP;
+				break;
+
+			default:
+				winschCmd = Command.NOCMD;
+				return;
+			}
+
+			this.sendEmptyMessageDelayed(BtServiceCommand.TIMEOUT.Value(), 500);
+
+			// Send command and set a timeout
+			logInfo("Send command: " + winschCmd.toString());
+			btWrite(winschCmd.getByte());
+		}
+
+
+		private void sendResponse(int bytesRead) {
+			byte[] bytes = Arrays.copyOf(btRxBuffer, bytesRead);
+
+			if (bytesRead == Sample.BYTE_SIZE) {
+				logInfo("Sample received.");
+				SendClientMessage(BtServiceResponse.SAMPLE_RECEIVED, bytes);
+			} else if (bytesRead == Parameter.BYTE_SIZE) {
+				logInfo("Parameter received.");
+				SendClientMessage(BtServiceResponse.PARAMETER_RECEIVED, bytes);
+			} else {
+				Log.e(this.getClass().getSimpleName(), "Corrupted data received.");
+			}
+
+		}
+
+
 		/**
 		 * Read serial data from the bluetooth.
+		 * 
+		 * Method attempt to places bytesToRead number of bytes into btRxBuffer.
+		 * If available byte in the input stream > bytesToRead then excessive bytes are skipped from
+		 * the start of the stream before filling btRxBuffer.
 		 * 
 		 * @return True when the number of bytes fill data package raw buffer.
 		 */
 		private boolean btRead() {
 			int bytesAvailable;
+			int remains = bytesToRead - bytesRead;
 
-			// Will take some time before data arrives
-			// try {
-			// Thread.sleep(40);
-			// } catch (InterruptedException e) {
-			// e.printStackTrace();
-			// }
+			if (remains <= 0) {
+				return true;
+			}
 
+			// Log.d("btRead", "Reading...");
 			try {
-				bytesAvailable = Math.min(bt_instream.available(), bytesToRead - bytesRead);
-				if (bytesAvailable <= 0) {
-					return true;
+				bytesAvailable = bt_instream.available();
+				if (bytesRead == 0) {
+					// Skip excessive bytes from the start of the input stream before filling
+					// btRxBuffer.
+					long skipped = 0;
+					bytesAvailable = bt_instream.available();
+					while (bytesAvailable - remains > 0) {
+						skipped += bt_instream.skip(bytesAvailable - remains);
+						try {
+							Thread.sleep(10);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+							return false;
+						}
+						bytesAvailable = bt_instream.available();
+					}	
+					if (skipped > 0) {
+						Log.d("btRead", String.format("Skipped %d bytes before fetching %d.",
+								skipped, remains));
+					}
+
 				}
-				bytesRead += bt_instream.read(btRxBuffer, bytesRead, bytesAvailable);
+
+				bytesRead += bt_instream.read(btRxBuffer, bytesRead,
+						Math.min(bytesAvailable, remains));
 
 			} catch (IOException e) {
 				Log.d(this.getClass().getSimpleName(),

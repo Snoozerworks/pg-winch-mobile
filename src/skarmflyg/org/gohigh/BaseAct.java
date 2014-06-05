@@ -4,6 +4,7 @@ import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.ParameterSet;
 import skarmflyg.org.gohigh.btservice.BTService;
 import skarmflyg.org.gohigh.btservice.BtServiceCommand;
+import skarmflyg.org.gohigh.btservice.BtServiceResponse;
 import skarmflyg.org.gohigh.btservice.LocalBinder;
 import android.app.Activity;
 import android.content.ComponentName;
@@ -24,7 +25,8 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 		OFFLINE, ONLINE_STANDBY, ONLINE_GET_SAMPLES, ONLINE_GET_PARAMS
 	};
 
-	static protected MODES mode = MODES.OFFLINE; // Mode of operation for activity
+	// static protected MODES mode = MODES.OFFLINE; // Mode of operation for activity
+	static protected BtServiceResponse reported_state;
 	static protected ParameterSet parameters; // Set of winch parameters
 	static private BTService btService; // Bluetooth service
 	protected Intent serviceIntent;
@@ -69,10 +71,16 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	@Override
 	protected void onResume() {
 		super.onResume();
-		Log.d(this.getClass().getSimpleName(), "onResume. Mode: " + mode.toString());
+		Log.d(this.getClass().getSimpleName(), "onResume.");
+		// Log.d(this.getClass().getSimpleName(), "onResume. Mode: " + mode.toString());
 
 		tv_txt_log = getTextView();
-		logTxtSet("Resuming. Mode: " + mode.toString());
+		logTxtSet("Resuming.");
+
+		if (btService != null) {
+			btService.winchSendCommand(BtServiceCommand.GET_STATE);
+		}
+		// logTxtSet("Resuming. Mode: " + mode.toString());
 
 		// bindService(serviceIntent, this, Context.BIND_AUTO_CREATE);
 		BTService.setClientHandler(getBtServiceHandler());
@@ -129,6 +137,8 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	public void onServiceConnected(ComponentName className, IBinder binder) {
 		Log.i(this.getClass().getSimpleName(), "onServiceConnected: " + className.toShortString());
 		btService = ((LocalBinder<BTService>) binder).getService();
+		btService.winchSendCommand(BtServiceCommand.GET_STATE);
+
 		// btService.setClientHandler(getBtServiceHandler());
 		Toast.makeText(BaseAct.this, R.string.btservice_connected, Toast.LENGTH_SHORT).show();
 	}
@@ -168,25 +178,38 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 
 
 	static protected void getParameter() {
-		if (mode == MODES.ONLINE_STANDBY || mode == MODES.ONLINE_GET_PARAMS) {
-			btService.winchSendCommand(BtServiceCommand.SET, 1100);
-		}
+		btService.winchSendCommand(BtServiceCommand.GET_PARAMETER);
+		// if (mode == MODES.ONLINE_STANDBY || mode == MODES.ONLINE_GET_PARAMS) {
+		// btService.winchSendCommand(BtServiceCommand.GET_PARAMETER);
+		// }
 	}
 
 
 	static protected void getParameters() {
-		if (mode == MODES.ONLINE_STANDBY) {
-			mode = MODES.ONLINE_GET_PARAMS;
-			parameters.clear(); // Clear current set of parameters
-			getParameter();
-		}
+		parameters.clear(); // Clear current set of parameters
+		btService.winchSendCommand(BtServiceCommand.GET_PARAMETERS);
+		// if (mode == MODES.ONLINE_STANDBY) {
+		// mode = MODES.ONLINE_GET_PARAMS;
+		// parameters.clear(); // Clear current set of parameters
+		// getParameter();
+		// }
+	}
+
+
+	static protected void stopGetting() {
+		btService.winchSendCommand(BtServiceCommand.STOP);
 	}
 
 
 	static protected void getSamples() {
-		if (mode == MODES.ONLINE_STANDBY || mode == MODES.ONLINE_GET_SAMPLES) {
+		if (reported_state != null && reported_state == BtServiceResponse.STATE_SAMPELS) {
+			btService.winchSendCommand(BtServiceCommand.STOP);
+		} else {
 			btService.winchSendCommand(BtServiceCommand.GET_SAMPLES);
 		}
+		// if (mode == MODES.ONLINE_STANDBY || mode == MODES.ONLINE_GET_SAMPLES) {
+		// btService.winchSendCommand(BtServiceCommand.GET_SAMPLES);
+		// }
 	}
 
 	protected View.OnClickListener onClickDownBtn = new OnClickListener() {
@@ -206,12 +229,13 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	};
 	protected View.OnClickListener onClickSampleBtn = new OnClickListener() {
 		public void onClick(View v) {
-			if (mode == MODES.ONLINE_STANDBY) {
-				mode = MODES.ONLINE_GET_SAMPLES;
-				getSamples();
-			} else if (mode == MODES.ONLINE_GET_SAMPLES) {
-				mode = MODES.ONLINE_STANDBY;
-			}
+			getSamples();
+			// if (mode == MODES.ONLINE_STANDBY) {
+			// mode = MODES.ONLINE_GET_SAMPLES;
+			// getSamples();
+			// } else if (mode == MODES.ONLINE_GET_SAMPLES) {
+			// mode = MODES.ONLINE_STANDBY;
+			// }
 		}
 	};
 	protected View.OnClickListener onClickSyncBtn = new OnClickListener() {
@@ -232,7 +256,7 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	static protected void logTxtSet(String txt) {
 		if (tv_txt_log == null)
 			return;
-		tv_txt_log.setText(txt);
+		tv_txt_log.setText(txt + "\n");
 	}
 
 }
