@@ -1,5 +1,11 @@
 package skarmflyg.org.gohigh.arduino;
 
+/**
+ * Objects of class Sample represents one sampled data from the winch.
+ * 
+ * 
+ * @author markus 
+ */
 public class Sample extends DataPackage {
 	static final public byte BYTE_SIZE = 11;
 
@@ -16,8 +22,11 @@ public class Sample extends DataPackage {
 	}
 
 
+	/**
+	 * Load data from raw byte array.
+	 */
 	public void LoadBytes() {
-//		mode = Mode.values()[byte2short(raw[0])];
+		// mode = Mode.values()[byte2short(raw[0])];
 		mode = Mode.get((byte) (raw[0] & 0xFF));
 		time = byte2long(raw[1], raw[2], raw[3], raw[4]);
 		tach_pump = byte2short(raw[5]);

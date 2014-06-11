@@ -2,6 +2,12 @@ package skarmflyg.org.gohigh.arduino;
 
 import android.os.Parcel;
 
+/**
+ * Objects of class Parameter represents one parameter from the winch.
+ * 
+ * @author markus
+ *
+ */
 public class Parameter extends DataPackage {
 	static final public byte BYTE_SIZE = 35;
 
@@ -68,7 +74,7 @@ public class Parameter extends DataPackage {
 
 	@Override
 	public String toString() {
-		String format = "%s\nmode.......: %d\nvalue......: %d\nlim (lo|hi): (%d,%d)\nmap (lo|hi): (%d|%d)";
+		String format = "%s\nmode.......: %s\nvalue......: %d\nlim (lo|hi): (%d,%d)\nmap (lo|hi): (%d|%d)";
 		return String.format(format, descr, mode.toString(), val, low, high, low_map, high_map);
 	}
 

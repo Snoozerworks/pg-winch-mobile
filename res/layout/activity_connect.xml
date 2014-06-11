@@ -91,19 +91,23 @@
                 android:id="@+id/imageView1"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:contentDescription="@string/img_oil_temp"
                 android:src="@drawable/custom_temp_icon" />
 
             <ImageView
                 android:id="@+id/imageView2"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:contentDescription="@string/img_drum_speed"
                 android:src="@drawable/custom_drum_icon" />
 
             <ImageView
                 android:id="@+id/imageView3"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:contentDescription="@string/img_pump_speed"
                 android:src="@drawable/custom_pump_icon" />
+
         </TableRow>
     </TableLayout>
 
@@ -117,9 +121,10 @@
             android:id="@+id/txt_log"
             android:layout_width="wrap_content"
             android:layout_height="0dp"
-            android:text="Anslut tilll vinchen."
+            android:text="@string/msg_connect_to_winch"
             android:textAppearance="?android:attr/textAppearanceMedium"
             android:typeface="monospace" />
+
     </ScrollView>
 
     <LinearLayout
@@ -133,18 +138,18 @@
             android:layout_height="wrap_content"
             android:text="@string/btn_connect" />
 
-        <Button
-            android:id="@+id/btn_go_sample"
+        <ToggleButton
+            android:id="@+id/btn_log"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/btn_go_sample"
-            android:visibility="invisible" />
+            android:textOff="@string/btn_log_off"
+            android:textOn="@string/btn_log_on" />
 
         <Button
             android:id="@+id/btn_op_load"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/btn_op_load"
+            android:text="@string/btn_sync"
             android:visibility="invisible" />
 
         <Button

@@ -3,7 +3,6 @@ package skarmflyg.org.gohigh;
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
-import skarmflyg.org.gohigh.btservice.BtServiceCommand;
 import skarmflyg.org.gohigh.btservice.BtServiceResponse;
 import skarmflyg.org.gohigh.widgets.Digits;
 import skarmflyg.org.gohigh.widgets.Meter;
@@ -15,6 +14,7 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.ToggleButton;
 
 public class ConnectAct extends BaseAct {
 
@@ -24,7 +24,7 @@ public class ConnectAct extends BaseAct {
 	static private Digits viewPumpDigits;
 
 	static private Button viewBtnConnect;
-	static private Button viewBtnSample;
+	static private ToggleButton viewBtnSample;
 	static private Button viewBtnSettingAct;
 	static private Button viewBtnSync;
 
@@ -55,7 +55,7 @@ public class ConnectAct extends BaseAct {
 		viewDrumDigits = (Digits) findViewById(id.drum_spd);
 		viewPumpDigits = (Digits) findViewById(id.pump_spd);
 		viewBtnConnect = (Button) findViewById(id.btn_connect);
-		viewBtnSample = (Button) findViewById(id.btn_go_sample);
+		viewBtnSample = (ToggleButton) findViewById(id.btn_log);
 		viewBtnSync = (Button) findViewById(id.btn_op_load);
 		viewBtnSettingAct = (Button) findViewById(id.btn_settings_act);
 
@@ -87,19 +87,6 @@ public class ConnectAct extends BaseAct {
 	}
 
 
-	// @Override
-	// protected void onResume() {
-	// setHandler(new ConnHandler());
-	// super.onResume();
-	// }
-
-	// @Override
-	// public void onDestroy() {
-	// Log.i(this.getClass().getSimpleName(), "onDestroy");
-	// doStopService();
-	// super.onDestroy();
-	// }
-
 	@Override
 	TextView getTextView() {
 		return (TextView) findViewById(id.txt_log);
@@ -124,22 +111,23 @@ public class ConnectAct extends BaseAct {
 				viewBtnSample.setVisibility(View.INVISIBLE);
 				viewBtnSync.setVisibility(View.INVISIBLE);
 				viewBtnSettingAct.setVisibility(View.INVISIBLE);
-				// mode = MODES.OFFLINE;
 				break;
 
 			case STATE_CONNECTED:
 				logTxt("Bluetooth uppkopplad.");
+
 			case STATE_STOPPED:
-				viewBtnSample.setText("Starta log");
+				viewBtnSample.setChecked(false);
 				viewBtnSync.setText("Starta sync");
 				viewBtnConnect.setText(txtBtnDisconnect);
 				viewBtnSample.setVisibility(View.VISIBLE);
 				viewBtnSync.setVisibility(View.VISIBLE);
 				viewBtnSettingAct.setVisibility(View.VISIBLE);
+				zeroMeters();
 				break;
 
 			case STATE_SAMPELS:
-				viewBtnSample.setText("Stoppa log");
+				viewBtnSample.setChecked(true);
 				viewBtnSample.setVisibility(View.VISIBLE);
 				viewBtnSync.setVisibility(View.INVISIBLE);
 				viewBtnSettingAct.setVisibility(View.INVISIBLE);
@@ -153,25 +141,22 @@ public class ConnectAct extends BaseAct {
 				break;
 
 			case HANDLER_SET:
-				// mode = (BTService.is_connected) ? MODES.STANDBY : MODES.DISCONNECTED;
 				logTxt(txtBtServiceConnected.toString());
 				break;
 
 			case HANDLER_UNSET:
-				// mode = MODES.DISCONNECTED;
 				logTxt(txtBtServiceDisconnected.toString());
 				break;
 
 			case PACKAGE_TIMEOUT:
 				logTxt("Package timeout.");
-				// mode = MODES.ONLINE_STANDBY;
 				break;
 
 			case PARAMETER_RECEIVED:
 				Parameter param = new Parameter();
 				param.LoadBytes((byte[]) msg.obj);
 				if (parameters.get(param.index) != null) {
-					stopGetting();					
+					stopGetting();
 					logTxt("Parameters synronized.");
 					applyParameters();
 
@@ -204,7 +189,16 @@ public class ConnectAct extends BaseAct {
 	};
 
 
-	static protected void applyParameters() {
+	static private void zeroMeters() {
+		viewTempDigits.setTargetVal(0);
+		viewDrumDigits.setTargetVal(0);
+		viewTempDigits.setTargetVal(0);
+		viewPressureGauge.setTargetVal(0);
+
+	}
+
+
+	static private void applyParameters() {
 		short i = 0;
 		Parameter p;
 		while ((p = parameters.get(i++)) != null) {

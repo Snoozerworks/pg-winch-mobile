@@ -3,7 +3,6 @@ package skarmflyg.org.gohigh.widgets;
 import java.util.Locale;
 import skarmflyg.org.gohigh.arduino.Parameter;
 
-
 public class SensorMapping {
 	public int val = 0;			// Current Value
 	private int target = 0;	// Setpoint value

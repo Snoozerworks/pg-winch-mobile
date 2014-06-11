@@ -125,7 +125,7 @@ containing a value of this type.
         public static final int LinearLayout1=0x7f070000;
         public static final int btn_connect=0x7f07000c;
         public static final int btn_down=0x7f070012;
-        public static final int btn_go_sample=0x7f07000d;
+        public static final int btn_log=0x7f07000d;
         public static final int btn_op_load=0x7f07000e;
         public static final int btn_set=0x7f070011;
         public static final int btn_settings_act=0x7f07000f;
@@ -150,29 +150,34 @@ containing a value of this type.
     }
     public static final class string {
         public static final int app_name=0x7f040000;
-        public static final int bt_connected=0x7f040015;
-        public static final int bt_disabled=0x7f040014;
-        public static final int bt_disconnected=0x7f040016;
-        public static final int bt_not_supported=0x7f040013;
+        public static final int bt_connected=0x7f040016;
+        public static final int bt_disabled=0x7f040015;
+        public static final int bt_disconnected=0x7f040017;
+        public static final int bt_not_supported=0x7f040014;
         public static final int btn_connect=0x7f040003;
         public static final int btn_disconnect=0x7f040004;
         public static final int btn_down=0x7f040007;
-        public static final int btn_go_sample=0x7f04000a;
-        public static final int btn_op_load=0x7f040009;
+        public static final int btn_log_off=0x7f04000b;
+        public static final int btn_log_on=0x7f04000a;
         public static final int btn_op_settings=0x7f040008;
         public static final int btn_set=0x7f040005;
-        public static final int btn_settings_act=0x7f040012;
+        public static final int btn_settings_act=0x7f04000c;
+        public static final int btn_sync=0x7f040009;
         public static final int btn_up=0x7f040006;
-        public static final int btservice_connected=0x7f04000e;
-        public static final int btservice_disconnected=0x7f04000f;
-        public static final int btservice_label=0x7f04000d;
-        public static final int btservice_started=0x7f04000b;
-        public static final int btservice_stopped=0x7f04000c;
+        public static final int btservice_connected=0x7f040010;
+        public static final int btservice_disconnected=0x7f040011;
+        public static final int btservice_label=0x7f04000f;
+        public static final int btservice_started=0x7f04000d;
+        public static final int btservice_stopped=0x7f04000e;
+        public static final int img_drum_speed=0x7f04001a;
+        public static final int img_oil_temp=0x7f040019;
+        public static final int img_pump_speed=0x7f04001b;
         public static final int menu_settings=0x7f040001;
-        public static final int meter_scale=0x7f040011;
-        public static final int parameter_act=0x7f040017;
+        public static final int meter_scale=0x7f040013;
+        public static final int msg_connect_to_winch=0x7f04001c;
+        public static final int parameter_act=0x7f040018;
         public static final int title_activity_connect=0x7f040002;
-        public static final int title_activity_service_note=0x7f040010;
+        public static final int title_activity_service_note=0x7f040012;
     }
     public static final class style {
         public static final int AppTheme=0x7f060000;

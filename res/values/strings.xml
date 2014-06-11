@@ -8,16 +8,16 @@
     <string name="btn_up">Öka</string>
     <string name="btn_down">Minska</string>
     <string name="btn_op_settings">Inställningar</string>
-    <string name="btn_op_load">Synca</string>
-    <string name="btn_go_sample">Status</string>
-    <string name="btservice_started">BT-service startad</string>
+    <string name="btn_sync">Synca</string>
+    <string name="btn_log_on">Log på</string>
+    <string name="btn_log_off">Log av</string><string name="btn_settings_act">Parametrar</string><string name="btservice_started">BT-service startad</string>
     <string name="btservice_stopped">BT-service stoppad</string>
     <string name="btservice_label">Uppkoppling vinsch via blåtand.</string>
     <string name="btservice_connected">BT-service ansluten</string>
     <string name="btservice_disconnected">BT-service frånkopplad</string>
     <string name="title_activity_service_note">ServiceNote</string>
     <string name="meter_scale">Meter scale</string>
-    <string name="btn_settings_act">Parametrar</string>
+    
 
     <string-array name="modes">
         <item>Av</item>
@@ -34,6 +34,11 @@
     <string name="bt_connected">Blåtand ansluten.</string>
     <string name="bt_disconnected">Blåtand frånkopplad.</string>
     <string name="parameter_act">Inställningar för vinsch</string>
+    <string name="img_oil_temp">Olje temperatur</string>
+    <string name="img_drum_speed">Trumhastighet</string>
+    <string name="img_pump_speed">Pumphastighet</string>
+    <string name="msg_connect_to_winch">Anslut till vinschen</string>
+    
     
 
 </resources>

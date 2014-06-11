@@ -14,6 +14,7 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -25,7 +26,6 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 		OFFLINE, ONLINE_STANDBY, ONLINE_GET_SAMPLES, ONLINE_GET_PARAMS
 	};
 
-	// static protected MODES mode = MODES.OFFLINE; // Mode of operation for activity
 	static protected BtServiceResponse reported_state;
 	static protected ParameterSet parameters; // Set of winch parameters
 	static private BTService btService; // Bluetooth service
@@ -34,15 +34,21 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	static private TextView tv_txt_log;
 
 
-	abstract Handler getBtServiceHandler(); // Method shall return a message handler for the
-											// bluetooth service.
+	/**
+	 * Method shall return a message handler for the bluetooth service.
+	 * 
+	 * @return
+	 */
+	abstract Handler getBtServiceHandler();
 
 
-	abstract TextView getTextView(); // Method shall return a text view which will be used text
-										// updates.
+	/**
+	 * Method shall return a text view which will be used for text updates.
+	 * 
+	 * @return
+	 */
+	abstract TextView getTextView();
 
-
-	// private ServiceConnection bt_service_connection;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -84,6 +90,11 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 
 		// bindService(serviceIntent, this, Context.BIND_AUTO_CREATE);
 		BTService.setClientHandler(getBtServiceHandler());
+	}
+
+	static class ConnHandler extends Handler {
+		public void handleMessage(Message msg) {
+		}
 	}
 
 
@@ -179,20 +190,12 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 
 	static protected void getParameter() {
 		btService.winchSendCommand(BtServiceCommand.GET_PARAMETER);
-		// if (mode == MODES.ONLINE_STANDBY || mode == MODES.ONLINE_GET_PARAMS) {
-		// btService.winchSendCommand(BtServiceCommand.GET_PARAMETER);
-		// }
 	}
 
 
 	static protected void getParameters() {
 		parameters.clear(); // Clear current set of parameters
 		btService.winchSendCommand(BtServiceCommand.GET_PARAMETERS);
-		// if (mode == MODES.ONLINE_STANDBY) {
-		// mode = MODES.ONLINE_GET_PARAMS;
-		// parameters.clear(); // Clear current set of parameters
-		// getParameter();
-		// }
 	}
 
 
@@ -207,9 +210,6 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 		} else {
 			btService.winchSendCommand(BtServiceCommand.GET_SAMPLES);
 		}
-		// if (mode == MODES.ONLINE_STANDBY || mode == MODES.ONLINE_GET_SAMPLES) {
-		// btService.winchSendCommand(BtServiceCommand.GET_SAMPLES);
-		// }
 	}
 
 	protected View.OnClickListener onClickDownBtn = new OnClickListener() {
@@ -230,12 +230,6 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	protected View.OnClickListener onClickSampleBtn = new OnClickListener() {
 		public void onClick(View v) {
 			getSamples();
-			// if (mode == MODES.ONLINE_STANDBY) {
-			// mode = MODES.ONLINE_GET_SAMPLES;
-			// getSamples();
-			// } else if (mode == MODES.ONLINE_GET_SAMPLES) {
-			// mode = MODES.ONLINE_STANDBY;
-			// }
 		}
 	};
 	protected View.OnClickListener onClickSyncBtn = new OnClickListener() {
