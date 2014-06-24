@@ -282,6 +282,7 @@ public class BTService extends Service {
 		try {
 			bt_socket = bt_device.createRfcommSocketToServiceRecord(BT_SPP_UUID);
 		} catch (IOException e) {
+			SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
 			SendClientMessage(BtServiceResponse.ANS_TXT, "ERROR! Failed creating RFCOMM socket.");
 			bt_socket = null;
 			return;
@@ -289,6 +290,7 @@ public class BTService extends Service {
 		try {
 			bt_socket.connect();
 		} catch (IOException e) {
+			SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
 			SendClientMessage(BtServiceResponse.ANS_TXT,
 					"ERROR! Failed connecting RFCOMM socket.\n" + e.getLocalizedMessage());
 			bt_socket = null;
@@ -298,6 +300,7 @@ public class BTService extends Service {
 			bt_instream = bt_socket.getInputStream();
 			bt_outstream = bt_socket.getOutputStream();
 		} catch (IOException e1) {
+			SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
 			SendClientMessage(BtServiceResponse.ANS_TXT, "ERROR! Failed creating streams.");
 			bt_instream = null;
 			bt_outstream = null;
@@ -322,6 +325,19 @@ public class BTService extends Service {
 	 */
 	public void winchSendCommand(BtServiceCommand cmd) {
 		bt_thread_handler.obtainMessage(cmd.Value()).sendToTarget();
+	}
+
+
+	/**
+	 * Send command to set winch parameter.
+	 * 
+	 * @param i
+	 *            Parameter index.
+	 * @param v
+	 *            Parameter value to set.
+	 */
+	public void winchSendSETP(byte i, short v) {
+		bt_thread_handler.obtainMessage(BtServiceCommand.SETP.Value(), v, i).sendToTarget();
 	}
 
 	static class BTThreadHandler extends Handler {
@@ -418,7 +434,7 @@ public class BTService extends Service {
 			default:
 				if (bytesToRead == 0) {
 					// No pending transfer. Ready to send a new command with timeout.
-					poll(msg_command);
+					poll(msg);
 				}
 			}
 
@@ -538,6 +554,7 @@ public class BTService extends Service {
 		 * <ul>
 		 * <li>GET_PARAMETERS - Get parameters until service receives BtServiceCommand.STOP.</li>
 		 * <li>SET - Get next parameter. Same as set button on winch.</li>
+		 * <li>SETP - Set parameter value in arg1 by specifying parameter index in arg2.</li>
 		 * <li>GET_PARAMETER - Same as SET</li>
 		 * <li>GET_SAMPLES - Get samples until service receives BtServiceCommand.STOP.</li>
 		 * <li>GET_SAMPLE - Get a single sample</li>
@@ -552,50 +569,76 @@ public class BTService extends Service {
 		 * 
 		 * @param msg_command
 		 */
-		private void poll(BtServiceCommand msg_command) {
+		private void poll(Message msg) {
+			byte[] tx_bytes = new byte[4];
+
+			BtServiceCommand msg_command = BtServiceCommand.get(msg.what);
+
+			// Skip all bytes in stream
 			btSkipStream();
-			Command winschCmd = Command.NOCMD;
+
+			//Command winschCmd = Command.NOCMD;
+			tx_bytes[0] = Command.NOCMD.getByte();
 			bytesRead = 0;
 			bytesToRead = 0;
 
 			switch (msg_command) {
+			case SETP:
+				bytesToRead = Parameter.BYTE_SIZE;
+				tx_bytes[0] = Command.SETP.getByte();
+				tx_bytes[1] = (byte) (msg.arg2);
+				tx_bytes[2] = (byte) ((msg.arg1 & 0xFF) >> 8);
+				tx_bytes[3] = (byte) (msg.arg1 & 0xFF);
+				break;
+				
+			case SELECT:
+				bytesToRead = Parameter.BYTE_SIZE;
+				tx_bytes[0] = Command.SET.getByte();
+				break;
+				
 			case GET_PARAMETERS:
 				tx_repeat = msg_command;
-			case SET:
+				SendClientMessage(BtServiceResponse.STATE_SYNCS);
 			case GET_PARAMETER:
 				bytesToRead = Parameter.BYTE_SIZE;
-				winschCmd = Command.SET;
-				SendClientMessage(BtServiceResponse.STATE_SYNCS);
+				tx_bytes[0] = Command.SETP.getByte();
 				break;
 
 			case GET_SAMPLES:
 				tx_repeat = msg_command;
+				SendClientMessage(BtServiceResponse.STATE_SAMPELS);
 			case GET_SAMPLE:
 				bytesToRead = Sample.BYTE_SIZE;
-				winschCmd = Command.GET;
-				SendClientMessage(BtServiceResponse.STATE_SAMPELS);
+				tx_bytes[0] = Command.GET.getByte();
 				break;
 
 			case DOWN:
 				bytesToRead = Parameter.BYTE_SIZE;
-				winschCmd = Command.DOWN;
+				tx_bytes[0] = Command.DOWN.getByte();
 				break;
 
 			case UP:
 				bytesToRead = Parameter.BYTE_SIZE;
-				winschCmd = Command.UP;
+				tx_bytes[0] = Command.UP.getByte();
 				break;
 
 			default:
-				winschCmd = Command.NOCMD;
+				tx_bytes[0] = Command.NOCMD.getByte();
 				return;
 			}
 
 			this.sendEmptyMessageDelayed(BtServiceCommand.TIMEOUT.Value(), BT_PACKAGE_TIMEOUT);
 
 			// Send command and set a timeout
-			logInfo("Send command: " + winschCmd.toString());
-			btWrite(winschCmd.getByte());
+			//logInfo("Send command: " + winschCmd.toString());
+
+			//tx_bytes[0] = winschCmd.getByte();
+			if (msg_command == BtServiceCommand.SETP) {
+				btWrite(tx_bytes);
+			} else {
+				btWrite(tx_bytes, 1);
+			}
+
 		}
 
 
@@ -681,16 +724,17 @@ public class BTService extends Service {
 			return (bytesRead == bytesToRead);
 		}
 
-
+		
 		/**
-		 * Write bytes to bluetooth.
+		 * Write byte array to bluetooth.
 		 * 
-		 * @param tx_bytes
+		 * @param tx_bytes Byte array.
+		 * @param len Number of bytes to write.
 		 * @return False if there was an IO exception..
 		 */
-		public boolean btWrite(byte[] tx_bytes) {
+		public boolean btWrite(byte[] tx_bytes, int len) {
 			try {
-				bt_outstream.write(tx_bytes);
+				bt_outstream.write(tx_bytes, 0, len);
 				bt_outstream.flush();
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -701,13 +745,26 @@ public class BTService extends Service {
 
 
 		/**
+		 * Write bytes to bluetooth.
+		 * 
+		 * @param tx_bytes
+		 * @return False if there was an IO exception..
+		 */
+		public boolean btWrite(byte[] tx_bytes) {
+			return btWrite(tx_bytes, tx_bytes.length);
+		}
+
+
+		
+		
+		/**
 		 * Write a single byte to bluetooth.
 		 * 
 		 * @param tx_bytes
 		 * @return False if there was an IO exception.
 		 */
 		public boolean btWrite(byte tx_bytes) {
-			return btWrite(new byte[] { tx_bytes });
+			return btWrite(new byte[] { tx_bytes }, 1);
 		}
 
 	};

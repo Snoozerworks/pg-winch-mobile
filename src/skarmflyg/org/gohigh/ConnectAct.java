@@ -23,13 +23,11 @@ public class ConnectAct extends BaseAct {
 	static private Digits viewDrumDigits;
 	static private Digits viewPumpDigits;
 
-	static private Button viewBtnConnect;
+	static private ToggleButton viewBtnConnect;
 	static private ToggleButton viewBtnSample;
 	static private Button viewBtnSettingAct;
-	static private Button viewBtnSync;
+	static private ToggleButton viewBtnSync;
 
-	static private CharSequence txtBtnConnect;
-	static private CharSequence txtBtnDisconnect;
 	static private CharSequence txtBtServiceConnected = "_Service bound";
 	static private CharSequence txtBtServiceDisconnected = "_Service unbound";
 
@@ -44,8 +42,6 @@ public class ConnectAct extends BaseAct {
 		btServiceHandler = new ConnHandler();
 
 		// Get texts
-		txtBtnConnect = getText(R.string.btn_connect);
-		txtBtnDisconnect = getText(R.string.btn_disconnect);
 		txtBtServiceConnected = getText(R.string.btservice_connected);
 		txtBtServiceDisconnected = getText(R.string.btservice_disconnected);
 
@@ -54,14 +50,14 @@ public class ConnectAct extends BaseAct {
 		viewTempDigits = (Digits) findViewById(id.temperature);
 		viewDrumDigits = (Digits) findViewById(id.drum_spd);
 		viewPumpDigits = (Digits) findViewById(id.pump_spd);
-		viewBtnConnect = (Button) findViewById(id.btn_connect);
+		viewBtnConnect = (ToggleButton) findViewById(id.btn_connect);
 		viewBtnSample = (ToggleButton) findViewById(id.btn_log);
-		viewBtnSync = (Button) findViewById(id.btn_op_load);
+		viewBtnSync = (ToggleButton) findViewById(id.btn_op_load);
 		viewBtnSettingAct = (Button) findViewById(id.btn_settings_act);
 
 		// Connect click listeners
 		viewBtnConnect.setOnClickListener(onClickConnectBtn);
-		viewBtnSample.setOnClickListener(onClickSampleBtn);
+		viewBtnSample.setOnClickListener(onClickSampleBtn);  // setOnClickListener(onClickSampleBtn);
 		viewBtnSync.setOnClickListener(onClickSyncBtn);
 		viewBtnSettingAct.setOnClickListener(new OnClickListener() {
 			public void onClick(View v) {
@@ -107,21 +103,21 @@ public class ConnectAct extends BaseAct {
 			switch (BtServiceResponse.get(msg.what)) {
 			case STATE_DISCONNECTED:
 				logTxt("Bluetooth nerkopplad.");
-				viewBtnConnect.setText(txtBtnConnect);
+				viewBtnConnect.setChecked(false);
 				viewBtnSample.setVisibility(View.INVISIBLE);
 				viewBtnSync.setVisibility(View.INVISIBLE);
 				viewBtnSettingAct.setVisibility(View.INVISIBLE);
 				break;
 
 			case STATE_CONNECTED:
+				viewBtnConnect.setChecked(true);
 				logTxt("Bluetooth uppkopplad.");
 
 			case STATE_STOPPED:
-				viewBtnSample.setChecked(false);
-				viewBtnSync.setText("Starta sync");
-				viewBtnConnect.setText(txtBtnDisconnect);
 				viewBtnSample.setVisibility(View.VISIBLE);
+				viewBtnSample.setChecked(false);
 				viewBtnSync.setVisibility(View.VISIBLE);
+				viewBtnSync.setChecked(false);
 				viewBtnSettingAct.setVisibility(View.VISIBLE);
 				zeroMeters();
 				break;
@@ -134,9 +130,9 @@ public class ConnectAct extends BaseAct {
 				break;
 
 			case STATE_SYNCS:
-				viewBtnSync.setText("Stoppa sync");
 				viewBtnSample.setVisibility(View.INVISIBLE);
 				viewBtnSync.setVisibility(View.VISIBLE);
+				viewBtnSync.setChecked(true);
 				viewBtnSettingAct.setVisibility(View.INVISIBLE);
 				break;
 

@@ -18,6 +18,7 @@ import android.os.Message;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.widget.CompoundButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -167,74 +168,72 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 		Toast.makeText(BaseAct.this, R.string.btservice_disconnected, Toast.LENGTH_SHORT).show();
 	}
 
-	protected View.OnClickListener onClickConnectBtn = new OnClickListener() {
-		public void onClick(View v) {
-			if (BTService.isConnected()) {
-				btService.BTDisconnect();
-			} else {
-				btService.BTConnect();
-			}
-		}
-	};
-
-
-	static protected void getDown() {
-		btService.winchSendCommand(BtServiceCommand.DOWN);
-	}
-
-
-	static protected void getUp() {
-		btService.winchSendCommand(BtServiceCommand.UP);
-	}
-
-
-	static protected void getParameter() {
-		btService.winchSendCommand(BtServiceCommand.GET_PARAMETER);
-	}
-
-
-	static protected void getParameters() {
-		parameters.clear(); // Clear current set of parameters
-		btService.winchSendCommand(BtServiceCommand.GET_PARAMETERS);
-	}
-
 
 	static protected void stopGetting() {
 		btService.winchSendCommand(BtServiceCommand.STOP);
 	}
 
 
-	static protected void getSamples() {
-		if (reported_state != null && reported_state == BtServiceResponse.STATE_SAMPELS) {
-			btService.winchSendCommand(BtServiceCommand.STOP);
-		} else {
-			btService.winchSendCommand(BtServiceCommand.GET_SAMPLES);
-		}
+	static protected void sendParameter(byte i, short v) {
+		btService.winchSendSETP(i, v);
 	}
 
-	protected View.OnClickListener onClickDownBtn = new OnClickListener() {
+	protected OnClickListener onClickConnectBtn = new OnClickListener() {
+		@Override
 		public void onClick(View v) {
-			getDown();
+			CompoundButton buttonView = (CompoundButton) v;
+			if (buttonView.isChecked()) {
+				btService.BTConnect();
+				buttonView.setChecked(false);
+			} else {
+				btService.BTDisconnect();
+				buttonView.setChecked(true);
+			}
+
+		}
+	};
+
+	protected View.OnClickListener onClickDownBtn = new OnClickListener() {
+		@Override
+		public void onClick(View v) {
+			btService.winchSendCommand(BtServiceCommand.DOWN);
 		}
 	};
 	protected View.OnClickListener onClickUpBtn = new OnClickListener() {
+		@Override
 		public void onClick(View v) {
-			getUp();
+			btService.winchSendCommand(BtServiceCommand.UP);
 		}
 	};
 	protected View.OnClickListener onClickSetBtn = new OnClickListener() {
+		@Override
 		public void onClick(View v) {
-			getParameter();
+			btService.winchSendCommand(BtServiceCommand.GET_PARAMETER);
 		}
 	};
-	protected View.OnClickListener onClickSampleBtn = new OnClickListener() {
+
+	OnClickListener onClickSampleBtn = new OnClickListener() {
+		@Override
 		public void onClick(View v) {
-			getSamples();
+			CompoundButton buttonView = (CompoundButton) v;
+			if (buttonView.isChecked()) {
+				btService.winchSendCommand(BtServiceCommand.GET_SAMPLES);
+			} else {
+				btService.winchSendCommand(BtServiceCommand.STOP);
+			}
 		}
 	};
-	protected View.OnClickListener onClickSyncBtn = new OnClickListener() {
+
+	protected OnClickListener onClickSyncBtn = new OnClickListener() {
+		@Override
 		public void onClick(View v) {
-			getParameters();
+			CompoundButton buttonView = (CompoundButton) v;
+			if (buttonView.isChecked()) {
+				parameters.clear(); // Clear current set of parameters
+				btService.winchSendCommand(BtServiceCommand.GET_PARAMETERS);
+			} else {
+				btService.winchSendCommand(BtServiceCommand.STOP);
+			}
 		}
 	};
 

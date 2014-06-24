@@ -132,11 +132,12 @@
         android:layout_height="wrap_content"
         android:layout_weight="0" >
 
-        <Button
+        <ToggleButton
             android:id="@+id/btn_connect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/btn_connect" />
+            android:textOff="@string/btn_connect_off"
+            android:textOn="@string/btn_connect_on" />
 
         <ToggleButton
             android:id="@+id/btn_log"
@@ -145,12 +146,13 @@
             android:textOff="@string/btn_log_off"
             android:textOn="@string/btn_log_on" />
 
-        <Button
+        <ToggleButton
             android:id="@+id/btn_op_load"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/btn_sync"
-            android:visibility="invisible" />
+            android:textOff="@string/btn_sync_off"
+            android:textOn="@string/btn_sync_on"
+            android:visibility="visible" />
 
         <Button
             android:id="@+id/btn_settings_act"
