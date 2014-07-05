@@ -20,7 +20,6 @@
         <attr name="wrn_lo" />
         <attr name="wrn_hi" />
     </declare-styleable>
-    
     <declare-styleable name="Meter">
         <attr name="num_format" />
         <attr name="rate_limit" />

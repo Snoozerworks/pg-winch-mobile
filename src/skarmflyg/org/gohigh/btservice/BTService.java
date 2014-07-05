@@ -6,6 +6,7 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.UUID;
 import skarmflyg.org.gohigh.ConnectAct;
+//import skarmflyg.org.gohigh.R.string;
 import skarmflyg.org.gohigh.R;
 import skarmflyg.org.gohigh.arduino.Command;
 import skarmflyg.org.gohigh.arduino.Parameter;
@@ -25,39 +26,299 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.NotificationCompat.Builder;
 import android.util.Log;
 import android.widget.Toast;
 
-public class BTService extends Service {
+public class BTService extends Service  {
 	// Bluetooth stuff
 	// static private final String BT_MAC = "00:06:66:43:11:8D"; // <-- ***
 	// Change MAC-address here! ***
-	static private final String BT_MAC = "00:06:66:43:07:C0"; // <-- *** Change
-																// MAC-address
-																// here! ***
-	private final static int BT_PACKAGE_TIMEOUT = 1000;	// Timeout in milliseconds
-	private final static int BT_PACKAGE_READ_PERIOD = 40;	// Period of reads in milliseconds
+	final static private String BT_MAC = "00:06:66:43:07:C0";
 
-	static private BluetoothSocket bt_socket;
-	static private InputStream bt_instream;
-	static private OutputStream bt_outstream;
-	static private final String BT_THREAD_NAME = "WinchThread";
-	static private final UUID BT_SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-	static private BTThreadHandler bt_thread_handler;
+	// Bluetooth thread name
+	final static private String BT_THREAD_NAME = "WinchThread";
 
-	private final HandlerThread bt_thread = new HandlerThread(BT_THREAD_NAME);
+	// Bluetooth timeout in milliseconds.
+	final static private int BT_PACKAGE_TIMEOUT = 1000;
 
-	static private final BluetoothAdapter bt_adapter = BluetoothAdapter.getDefaultAdapter();
-	static private BluetoothDevice bt_device;
+	// Bluetooth period of reads in milliseconds.
+	final static private int BT_PACKAGE_READ_PERIOD = 40;
 
+	// Bluetooth thread.
+	final private HandlerThread btThread;
+
+	// Bluetooth UUID. General for serial communication.
+	final static private UUID BT_SPP_UUID = UUID
+			.fromString("00001101-0000-1000-8000-00805F9B34FB");
+
+	// Bluetooth socket and streams
+	static private BluetoothSocket btSocket;
+	static private InputStream btInstream;
+	static private OutputStream btOutstream;
+
+	// Receive bluetooth events.
+	private final BroadcastReceiver btBroadcastReceiver;
+
+	// Handle thread communication
+	final private BluetoothAdapter btAdapter;
+	static private BluetoothDevice btDevice;
+	static private BtCommandHandler btCommandHandler;
+
+	// Handle messages to client
+	static private Messenger clientMessenger;
+
+	// Notifier
 	private NotificationManager mNM;
-	static private Handler clientHandler;
 
 	// Unique Identification Number for the Notification. We use it on
 	// Notification start, and to cancel it.
 	private int NOTIFICATION = R.string.btservice_started;
 
+	public static final int GRAPH_SAMPEL_COUNT = 50;
+	private static final int FILE_SAMPEL_COUNT = 1500;
+	private static SampleStoreFile sampleStore;
+	BtResponseStoreHandler handler;
+	
+
+	
+	
+	
+	BtThread tstthread;
+
+	/**
+	 * Constructor
+	 */
+	public BTService() {
+		super();
+
+		Log.d(BTService.class.getSimpleName(), "BTService construct");
+
+		btAdapter = BluetoothAdapter.getDefaultAdapter();
+		btThread = new HandlerThread(BT_THREAD_NAME);
+		btThread.start();
+		btCommandHandler = new BtCommandHandler(btThread.getLooper());
+
+		handler = new BtResponseStoreHandler();
+
+		
+		
+		/**
+		 * Broadcast receiver used to listen for when the bluetooth connects and
+		 * disconnects. When the bluetooth is connected/disconnected the
+		 * MSG_BT_CONNECTED/MSG_BT_DISCONNECTED is sent to the client message
+		 * handler.
+		 */
+		btBroadcastReceiver = new BroadcastReceiver() {
+			public void onReceive(Context context, Intent intent) {
+				String action = intent.getAction();
+
+				NotificationCompat.Builder builder;
+				builder = getNotification();
+
+				if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+					builder.setContentText(getText(R.string.bt_connected));
+					mNM.notify(NOTIFICATION, builder.build());
+
+					tellClient(BtServiceResponse.STATE_CONNECTED);
+
+				} else if (BluetoothDevice.ACTION_ACL_DISCONNECTED
+						.equals(action)) {
+					builder.setContentText(getText(R.string.bt_disconnected));
+					mNM.notify(NOTIFICATION, builder.build());
+					btSocket = null;
+					btInstream = null;
+					btOutstream = null;
+
+					tellClient(BtServiceResponse.STATE_DISCONNECTED);
+
+				}
+
+			}
+		};
+
+		sampleStore = new SampleStoreFile(GRAPH_SAMPEL_COUNT, FILE_SAMPEL_COUNT);
+	}
+
+	@Override
+	public void onCreate() {
+		logInfo("onCreate");
+		
+		// Add intent filters to catch bluetooth connection and disconnection.
+		IntentFilter btIntentFilter = new IntentFilter();
+		btIntentFilter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
+		btIntentFilter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+		registerReceiver(btBroadcastReceiver, btIntentFilter);
+
+		// Display a notification to announce started service.
+		Builder notification = getNotification();
+		notification.setContentText(getText(R.string.btservice_started));
+		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+		mNM.notify(NOTIFICATION, notification.build());
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		logInfo("onStartCommand. Received start id " + startId + ": " + intent);
+
+		clientMessenger = intent.getParcelableExtra("clientmessenger");
+
+		winchSendCommand(BtServiceCommand.GET_STATE);
+
+		// We want this service to continue running until it is explicitly
+		// stopped, so return sticky.
+		return START_STICKY;
+	}
+
+	@Override
+	public IBinder onBind(Intent intent) {
+		logInfo("onBind");
+		return null;
+		// return new LocalBinder<BTService>(this);
+	}
+
+	@Override
+	public void onDestroy() {
+		logInfo("onDestroy");
+
+		// Disconnect bluetooth
+		btDisconnect();
+
+		// Cancel the persistent notification.
+		mNM.cancel(NOTIFICATION);
+
+		unregisterReceiver(btBroadcastReceiver);
+		btCommandHandler.getLooper().quit();
+		btCommandHandler = null;
+
+		// Tell the user we stopped.
+		Toast.makeText(this, R.string.btservice_stopped, Toast.LENGTH_SHORT)
+				.show();
+	}
+
+	/**
+	 * Connect to bluetooth. Enable adapter and select device if necessary.
+	 * Sends message MSG_BT_CONNECTED to client message handler once connected
+	 * (also when already connected). Sends MSG_ANS_TXT with accompanied text if
+	 * bluetooth is not supported or is not enabled.
+	 * 
+	 * This method setup the bluetooth socket, input stream and output stream.
+	 */
+	public void btConnect() {
+		if (btIsConnected()) {
+			tellClient(BtServiceResponse.STATE_CONNECTED);
+			return;
+		}
+
+		// Check bluetooth is supported
+		if (btAdapter == null) {
+			tellClient(BtServiceResponse.ANS_TXT,
+					getText(R.string.bt_not_supported));
+			return;
+		}
+
+		// Check bluetooth is enabled
+		if (!btAdapter.isEnabled()) {
+			tellClient(BtServiceResponse.ANS_TXT, getText(R.string.bt_disabled));
+			return;
+		}
+
+		// Try get remote bluetooth device
+		btDevice = btAdapter.getRemoteDevice(BT_MAC);
+
+		// Create bluetooth rfcomm socket (serial communication)
+		try {
+			btSocket = btDevice.createRfcommSocketToServiceRecord(BT_SPP_UUID);
+		} catch (IOException e) {
+			tellClient(BtServiceResponse.STATE_DISCONNECTED);
+			tellClient(BtServiceResponse.ANS_TXT,
+					"ERROR! Failed creating RFCOMM socket.");
+			btSocket = null;
+			return;
+		}
+
+		// Always cancel discovery before connecting
+		btAdapter.cancelDiscovery();
+
+		// Connect...
+		try {
+			btSocket.connect();
+		} catch (IOException e) {
+			tellClient(BtServiceResponse.STATE_DISCONNECTED);
+			tellClient(
+					BtServiceResponse.ANS_TXT,
+					"ERROR! Failed connecting RFCOMM socket.\n"
+							+ e.getLocalizedMessage());
+			btSocket = null;
+			return;
+		}
+
+		// Create input and output streams
+		try {
+			btInstream = btSocket.getInputStream();
+			btOutstream = btSocket.getOutputStream();
+		} catch (IOException e1) {
+			tellClient(BtServiceResponse.STATE_DISCONNECTED);
+			tellClient(BtServiceResponse.ANS_TXT,
+					"ERROR! Failed creating streams.");
+			btInstream = null;
+			btOutstream = null;
+			e1.printStackTrace();
+		}
+
+	}
+
+	// /**
+	// * Close bluetooth socket.
+	// */
+	// public void BTDisconnect() {
+	// // SendBtMessage(BtServiceCommand.DISCONNECT);
+	// btDisconnect();
+	// }
+
+	/**
+	 * Close input and output streams and the bluetooth socket.
+	 * 
+	 * @return
+	 */
+	public void btDisconnect() {
+		if (btInstream != null) {
+			try {
+				btInstream.close();
+			} catch (Exception e) {
+			}
+			btInstream = null;
+		}
+
+		if (btOutstream != null) {
+			try {
+				btOutstream.close();
+			} catch (Exception e) {
+			}
+			btOutstream = null;
+		}
+
+		if (btSocket != null) {
+			try {
+				btSocket.close();
+			} catch (Exception e) {
+			}
+			btSocket = null;
+		}
+
+	}
+
+	/**
+	 * Check if a bluetooth connection is established.
+	 * 
+	 * @return True if connected.
+	 */
+	public boolean btIsConnected() {
+		return (btSocket != null && btSocket.isConnected());
+	}
 
 	/**
 	 * Short for Log.i(this.getClass().getSimpleName(), s)
@@ -68,141 +329,20 @@ public class BTService extends Service {
 		Log.i(this.getClass().getSimpleName(), s);
 	}
 
-
-	@Override
-	public void onCreate() {
-		logInfo("onCreate");
-		registerReceiver(broadcast_receiver, new IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED));
-		registerReceiver(broadcast_receiver, new IntentFilter(
-				BluetoothDevice.ACTION_ACL_DISCONNECTED));
-
-		if (!bt_thread.isAlive()) {
-			bt_thread.start();
-		}
-
-		bt_thread_handler = new BTThreadHandler(bt_thread.getLooper());
-
-		// Display a notification about us starting. We put an icon in the
-		// status bar.
-		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-		mNM.notify(NOTIFICATION, getNotification().build());
-	}
-
-
-	@Override
-	public void onDestroy() {
-		logInfo("onDestroy");
-
-		// Cancel the persistent notification.
-		mNM.cancel(NOTIFICATION);
-		bt_thread.interrupt();
-		// Tell the user we stopped.
-		Toast.makeText(this, R.string.btservice_stopped, Toast.LENGTH_SHORT).show();
-		unregisterReceiver(broadcast_receiver);
-	}
-
-
-	/**
-	 * Check if a bluetooth connection is established.
-	 * 
-	 * @return True if connected.
-	 */
-	static public boolean isConnected() {
-		return (bt_socket != null && bt_socket.isConnected());
-	}
-
-
-	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
-		logInfo("onStartCommand. Received start id " + startId + ": " + intent);
-		// We want this service to continue running until it is explicitly
-		// stopped, so return sticky.
-		return START_STICKY;
-	}
-
-
-	@Override
-	public IBinder onBind(Intent intent) {
-		logInfo("onBind");
-		return new LocalBinder<BTService>(this);
-	}
-
-
-	/**
-	 * Called by client to set a message handler receiving messages from this service. Note that if
-	 * a handler is already set it must be unset calling unsetClientHandler() first.
-	 * 
-	 * @param h
-	 *            Message handler.
-	 */
-	static public void setClientHandler(Handler h) {
-		if (clientHandler != null) {
-			return;
-		}
-		clientHandler = h;
-
-		SendClientMessage(BtServiceResponse.HANDLER_SET);
-		if (BTService.isConnected()) {
-			SendClientMessage(BtServiceResponse.STATE_CONNECTED);
-		}
-	}
-
-
-	/**
-	 * Call to unset any client message handlers
-	 */
-	static public void unsetClientHandler() {
-		if (clientHandler != null) {
-			SendClientMessage(BtServiceResponse.HANDLER_UNSET);
-			clientHandler = null;
-		}
-	}
-
-	/**
-	 * Broadcast receiver used to listen for when the bluetooth connects and disconnects. When the
-	 * bluetooth is connected/disconnected the MSG_BT_CONNECTED/MSG_BT_DISCONNECTED is sent to the
-	 * client message handler.
-	 */
-	private final BroadcastReceiver broadcast_receiver = new BroadcastReceiver() {
-		public void onReceive(Context context, Intent intent) {
-			String action = intent.getAction();
-
-			if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
-				// is_connected = true;
-				mNM.notify(NOTIFICATION,
-						getNotification().setContentText(getText(R.string.bt_connected)).build());
-				SendClientMessage(BtServiceResponse.STATE_CONNECTED);
-
-			} else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
-				// is_connected = false;
-				mNM.notify(NOTIFICATION,
-						getNotification().setContentText(getText(R.string.bt_disconnected)).build());
-				bt_socket = null;
-				bt_instream = null;
-				bt_outstream = null;
-				SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
-
-			}
-
-		}
-	};
-
-
 	/**
 	 * Show a notification while this service is running.
 	 */
 	private NotificationCompat.Builder getNotification() {
-		// Set the icon, scrolling text and time stamp
-		NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(this)
-				.setSmallIcon(R.drawable.ic_stat_notify) //
-				.setContentText(getText(R.string.btservice_started)) //
+		// Set icon, scrolling text and time stamp
+		NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(
+				this).setSmallIcon(R.drawable.ic_stat_notify) //
 				.setContentTitle(getText(R.string.app_name)) //
 				.setWhen(System.currentTimeMillis());
 
 		// The PendingIntent to launch our activity if the user selects this
 		// notification
-		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this,
-				ConnectAct.class), 0);
+		PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
+				new Intent(this, ConnectAct.class), 0);
 
 		// Set the info for the views that show in the notification panel.
 		mBuilder.setContentIntent(contentIntent);
@@ -210,113 +350,43 @@ public class BTService extends Service {
 		return mBuilder;
 	}
 
-
-	static private boolean SendClientMessage(BtServiceResponse what) {
-		try {
-			clientHandler.obtainMessage(what.Value()).sendToTarget();
-		} catch (Exception e) {
-			return false;
-		}
-		return true;
-	}
-
-
-	static private boolean SendClientMessage(BtServiceResponse what, byte[] obj) {
-		try {
-			clientHandler.obtainMessage(what.Value(), obj).sendToTarget();
-		} catch (Exception e) {
-			return false;
-		}
-		return true;
-	}
-
-
-	static private boolean SendClientMessage(BtServiceResponse what, CharSequence obj) {
-		try {
-			clientHandler.obtainMessage(what.Value(), obj).sendToTarget();
-		} catch (Exception e) {
-			return false;
-		}
-		return true;
-	}
-
-
-	private boolean SendBtMessage(BtServiceCommand message) {
-		try {
-			bt_thread_handler.sendEmptyMessage(message.Value());
-		} catch (Exception e) {
-			return false;
-		}
-		return true;
-	}
-
-
 	/**
-	 * Connect to bluetooth. Enable adapter and select device if necessary. Sends message
-	 * MSG_BT_CONNECTED to client message handler once connected (also when already connected).
-	 * Sends MSG_ANS_TXT with accompanied text if bluetooth is not supported or is not enabled.
+	 * Send a response to the client.
 	 * 
-	 * This method setup the bluetooth socket, input stream and output stream.
+	 * @param response
 	 */
-	public void BTConnect() {
-		if (BTService.isConnected()) {
-			SendClientMessage(BtServiceResponse.STATE_CONNECTED);
-			return;
-		}
-
-		// Check bluetooth is supported
-		if (bt_adapter == null) {
-			SendClientMessage(BtServiceResponse.ANS_TXT, getText(R.string.bt_not_supported));
-			return;
-		}
-
-		// Check bluetooth is enabled
-		if (!bt_adapter.isEnabled()) {
-			SendClientMessage(BtServiceResponse.ANS_TXT, getText(R.string.bt_disabled));
-			return;
-		}
-
-		// Try get remote bluetooth device
-		bt_device = bt_adapter.getRemoteDevice(BT_MAC);
-
-		try {
-			bt_socket = bt_device.createRfcommSocketToServiceRecord(BT_SPP_UUID);
-		} catch (IOException e) {
-			SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
-			SendClientMessage(BtServiceResponse.ANS_TXT, "ERROR! Failed creating RFCOMM socket.");
-			bt_socket = null;
-			return;
-		}
-		try {
-			bt_socket.connect();
-		} catch (IOException e) {
-			SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
-			SendClientMessage(BtServiceResponse.ANS_TXT,
-					"ERROR! Failed connecting RFCOMM socket.\n" + e.getLocalizedMessage());
-			bt_socket = null;
-			return;
-		}
-		try {
-			bt_instream = bt_socket.getInputStream();
-			bt_outstream = bt_socket.getOutputStream();
-		} catch (IOException e1) {
-			SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
-			SendClientMessage(BtServiceResponse.ANS_TXT, "ERROR! Failed creating streams.");
-			bt_instream = null;
-			bt_outstream = null;
-			e1.printStackTrace();
-		}
-
+	static private void tellClient(BtServiceResponse response) {
+		tellClient(response, null);
 	}
-
 
 	/**
-	 * Close bluetooth socket.
+	 * Send a response to the client.
+	 * 
+	 * @param response
+	 * @param obj
 	 */
-	public void BTDisconnect() {
-		SendBtMessage(BtServiceCommand.DISCONNECT);
+	static private void tellClient(BtServiceResponse response, Object obj) {
+		Message m = Message.obtain();
+		m.what = response.Value();
+		m.obj = obj;
+		try {
+			clientMessenger.send(m);
+			// TODO below does not work...
+			// msn.send(m);
+		} catch (RemoteException e) {
+			Log.e(BTService.class.getSimpleName(),
+					"Failed sending message client");
+			e.printStackTrace();
+		}
 	}
 
+	// /**
+	// * Close bluetooth socket.
+	// */
+	// public void BTDisconnect() {
+	// // SendBtMessage(BtServiceCommand.DISCONNECT);
+	// btDisconnect();
+	// }
 
 	/**
 	 * Send a command to the winch to expect a Sample or Parameter back.
@@ -324,12 +394,11 @@ public class BTService extends Service {
 	 * @param cmd
 	 */
 	public void winchSendCommand(BtServiceCommand cmd) {
-		bt_thread_handler.obtainMessage(cmd.Value()).sendToTarget();
+		btCommandHandler.obtainMessage(cmd.Value()).sendToTarget();
 	}
 
-
 	/**
-	 * Send command to set winch parameter.
+	 * Send command to set winsch parameter.
 	 * 
 	 * @param i
 	 *            Parameter index.
@@ -337,28 +406,37 @@ public class BTService extends Service {
 	 *            Parameter value to set.
 	 */
 	public void winchSendSETP(byte i, short v) {
-		bt_thread_handler.obtainMessage(BtServiceCommand.SETP.Value(), v, i).sendToTarget();
+		btCommandHandler.obtainMessage(BtServiceCommand.SETP.Value(), v, i)
+				.sendToTarget();
 	}
 
-	static class BTThreadHandler extends Handler {
+	/**
+	 * Return the storage for samples.
+	 * 
+	 * @return
+	 */
+	public SampleStore getSampleStore() {
+		return sampleStore;
+	}
 
-		// private boolean tx_repeat = false; // Flag to get last command sent repeated.
-		private BtServiceCommand tx_repeat; // Flag to get last command sent repeated.
+	static class BtCommandHandler extends Handler {
+
+		// Flag to get last command sent repeated.
+		private BtServiceCommand tx_repeat;
 		static private byte[] btRxBuffer;
 		static private int bytesRead = 0;
 		static private int bytesToRead = 0;
-
 
 		/**
 		 * Constructor
 		 * 
 		 * @param looper
 		 */
-		public BTThreadHandler(Looper looper) {
+		public BtCommandHandler(Looper looper) {
 			super(looper);
-			btRxBuffer = new byte[Math.max(Parameter.BYTE_SIZE, Sample.BYTE_SIZE)];
+			int buf_size = Math.max(Parameter.BYTE_SIZE, Sample.BYTE_SIZE);
+			btRxBuffer = new byte[buf_size];
 		}
-
 
 		/**
 		 * Short for Log.i(this.getClass().getSimpleName(), s)
@@ -369,7 +447,6 @@ public class BTService extends Service {
 			Log.i(this.getClass().getSimpleName(), s);
 		}
 
-
 		/**
 		 * Handle messages to the thread.
 		 * 
@@ -377,25 +454,29 @@ public class BTService extends Service {
 		 * <ul>
 		 * <li>DISCONNECT : Close streams and bluetooth socket.</li>
 		 * <li>GET_PARAMETER : Send a single SET command.</li>
-		 * <li>GET_PARAMETERS : Send a SET command and a new SET after each sample received.</li>
+		 * <li>GET_PARAMETERS : Send a SET command and a new SET after each
+		 * sample received.</li>
 		 * <li>SET : See GET_PARAMETER.</li>
 		 * <li>GET_SAMPLE : Send a single GET command.</li>
-		 * <li>GET_SAMPLES : Send a GET command and a new GET after each sample received.</li>
+		 * <li>GET_SAMPLES : Send a GET command and a new GET after each sample
+		 * received.</li>
 		 * <li>KILL : Close streams and bluetooth socket. Interrupt thread.</li>
 		 * <li>TIMEOUT : Used from inside thread to issue a timeout.</li>
 		 * <li>_READ : Read bytes from input stream.</li>
 		 * </ul>
 		 * 
-		 * The timeout in milliseconds should be specified in msg.arg1. All messages with commands
-		 * except DISCONNECT, KILL and TIMEOUT will be ignored until a sample or parameter has been
-		 * successfully received or there was a time out.
+		 * The timeout in milliseconds should be specified in msg.arg1. All
+		 * messages with commands except DISCONNECT, KILL and TIMEOUT will be
+		 * ignored until a sample or parameter has been successfully received or
+		 * there was a time out.
 		 * 
 		 * @param msg
-		 *            Message where msg.obj=BtServiceCommand and msg.arg1=timeout.
+		 *            Message where msg.obj=BtServiceCommand and
+		 *            msg.arg1=timeout.
 		 */
 		public void handleMessage(Message msg) {
 			if (Thread.currentThread().isInterrupted()) {
-				onDisconnectCmd();
+				// btDisconnect();
 				return;
 			}
 
@@ -404,11 +485,16 @@ public class BTService extends Service {
 			switch (msg_command) {
 			case KILL:
 				// Interrupt thread and close socket.
+				Log.d(this.getClass().getSimpleName(),
+						"KILL thread "
+								+ Long.toString(Thread.currentThread().getId()));
+
+				getLooper().quit();
 				Thread.currentThread().interrupt();
 
 			case DISCONNECT:
-				// Close sockets.
-				onDisconnectCmd();
+				// TODO Correct?
+				// bytesToRead = 0;
 				return;
 
 			case TIMEOUT:
@@ -422,7 +508,8 @@ public class BTService extends Service {
 				return;
 
 			case GET_STATE:
-				// Send current state to client.
+				// Send current service state to client. Does not send anything
+				// to the winsch.
 				onGetStateCmd();
 				return;
 
@@ -433,7 +520,8 @@ public class BTService extends Service {
 
 			default:
 				if (bytesToRead == 0) {
-					// No pending transfer. Ready to send a new command with timeout.
+					// No pending transfer. Ready to send a new command with
+					// timeout.
 					poll(msg);
 				}
 			}
@@ -447,52 +535,17 @@ public class BTService extends Service {
 				if (tx_repeat != null) {
 					this.sendEmptyMessage(tx_repeat.Value());
 				} else {
-					SendClientMessage(BtServiceResponse.STATE_STOPPED);
+					tellClient(BtServiceResponse.STATE_STOPPED);
 				}
 
 			} else {
 				// More data to receive.
-				this.sendEmptyMessageDelayed(BtServiceCommand._READ.Value(), BT_PACKAGE_READ_PERIOD);
+				this.sendEmptyMessageDelayed(BtServiceCommand._READ.Value(),
+						BT_PACKAGE_READ_PERIOD);
 
 			}
 
 		}
-
-
-		/**
-		 * Reset input and output streams and make sure socket is closed. This method will be used
-		 * during shutdown() to ensure that the connection is properly closed.
-		 * 
-		 * @return
-		 */
-		static private void onDisconnectCmd() {
-			bytesToRead = 0;
-			if (bt_instream != null) {
-				try {
-					bt_instream.close();
-				} catch (Exception e) {
-				}
-				bt_instream = null;
-			}
-
-			if (bt_outstream != null) {
-				try {
-					bt_outstream.close();
-				} catch (Exception e) {
-				}
-				bt_outstream = null;
-			}
-
-			if (bt_socket != null) {
-				try {
-					bt_socket.close();
-				} catch (Exception e) {
-				}
-				bt_socket = null;
-			}
-
-		}
-
 
 		/**
 		 * Sends, in order, PACKAGE_TIMEOUT and STATE_STOPPED to client.
@@ -503,10 +556,9 @@ public class BTService extends Service {
 			logInfo("Package timeout.");
 			bytesToRead = 0;
 			this.removeCallbacksAndMessages(null);
-			SendClientMessage(BtServiceResponse.PACKAGE_TIMEOUT);
-			SendClientMessage(BtServiceResponse.STATE_STOPPED);
+			tellClient(BtServiceResponse.PACKAGE_TIMEOUT);
+			tellClient(BtServiceResponse.STATE_STOPPED);
 		}
-
 
 		/**
 		 * Stops polling the winch for more data. Send STATE_STOPPED to client.
@@ -515,9 +567,8 @@ public class BTService extends Service {
 			tx_repeat = null;
 			bytesToRead = 0;
 			this.removeCallbacksAndMessages(null);
-			SendClientMessage(BtServiceResponse.STATE_STOPPED);
+			tellClient(BtServiceResponse.STATE_STOPPED);
 		}
-
 
 		/**
 		 * Send current state of service to client.
@@ -531,41 +582,42 @@ public class BTService extends Service {
 		 * <ul/>
 		 */
 		private void onGetStateCmd() {
-			if (bt_socket == null || !bt_socket.isConnected()) {
-				SendClientMessage(BtServiceResponse.STATE_DISCONNECTED);
+			if (btSocket == null || !btSocket.isConnected()) {
+				tellClient(BtServiceResponse.STATE_DISCONNECTED);
 
 			} else if (bytesToRead == Sample.BYTE_SIZE) {
-				SendClientMessage(BtServiceResponse.STATE_SAMPELS);
+				tellClient(BtServiceResponse.STATE_SAMPELS);
 
 			} else if (bytesToRead == Parameter.BYTE_SIZE) {
-				SendClientMessage(BtServiceResponse.STATE_SYNCS);
+				tellClient(BtServiceResponse.STATE_SYNCS);
 
 			} else {
-				SendClientMessage(BtServiceResponse.STATE_STOPPED);
+				tellClient(BtServiceResponse.STATE_STOPPED);
 
 			}
 		}
-
 
 		/**
 		 * Poll winch for a {@link Parameter} or {@link Sample}.
 		 * 
 		 * Commands can be
 		 * <ul>
-		 * <li>GET_PARAMETERS - Get parameters until service receives BtServiceCommand.STOP.</li>
+		 * <li>GET_PARAMETERS - Get parameters until service receives
+		 * BtServiceCommand.STOP.</li>
 		 * <li>SET - Get next parameter. Same as set button on winch.</li>
-		 * <li>SETP - Set parameter value in arg1 by specifying parameter index in arg2.</li>
+		 * <li>SETP - Set parameter value in arg1 by specifying parameter index
+		 * in arg2.</li>
 		 * <li>GET_PARAMETER - Same as SET</li>
-		 * <li>GET_SAMPLES - Get samples until service receives BtServiceCommand.STOP.</li>
+		 * <li>GET_SAMPLES - Get samples until service receives
+		 * BtServiceCommand.STOP.</li>
 		 * <li>GET_SAMPLE - Get a single sample</li>
 		 * <li>DOWN - Same as down button on winch.</li>
 		 * <li>UP - Same as down button on winch.</li>
 		 * <li>NOCMD - Empty command. Do nothing.</li>
 		 * </ul>
 		 * 
-		 * Skips all bytes in bluetooth input stream by calling btSkipStream() before sending the
-		 * new
-		 * command.
+		 * Skips all bytes in bluetooth input stream by calling btSkipStream()
+		 * before sending the new command.
 		 * 
 		 * @param msg_command
 		 */
@@ -577,7 +629,7 @@ public class BTService extends Service {
 			// Skip all bytes in stream
 			btSkipStream();
 
-			//Command winschCmd = Command.NOCMD;
+			// Command winschCmd = Command.NOCMD;
 			tx_bytes[0] = Command.NOCMD.getByte();
 			bytesRead = 0;
 			bytesToRead = 0;
@@ -590,15 +642,15 @@ public class BTService extends Service {
 				tx_bytes[2] = (byte) ((msg.arg1 & 0xFF) >> 8);
 				tx_bytes[3] = (byte) (msg.arg1 & 0xFF);
 				break;
-				
+
 			case SELECT:
 				bytesToRead = Parameter.BYTE_SIZE;
 				tx_bytes[0] = Command.SET.getByte();
 				break;
-				
+
 			case GET_PARAMETERS:
 				tx_repeat = msg_command;
-				SendClientMessage(BtServiceResponse.STATE_SYNCS);
+				tellClient(BtServiceResponse.STATE_SYNCS);
 			case GET_PARAMETER:
 				bytesToRead = Parameter.BYTE_SIZE;
 				tx_bytes[0] = Command.SETP.getByte();
@@ -606,7 +658,7 @@ public class BTService extends Service {
 
 			case GET_SAMPLES:
 				tx_repeat = msg_command;
-				SendClientMessage(BtServiceResponse.STATE_SAMPELS);
+				tellClient(BtServiceResponse.STATE_SAMPELS);
 			case GET_SAMPLE:
 				bytesToRead = Sample.BYTE_SIZE;
 				tx_bytes[0] = Command.GET.getByte();
@@ -627,12 +679,13 @@ public class BTService extends Service {
 				return;
 			}
 
-			this.sendEmptyMessageDelayed(BtServiceCommand.TIMEOUT.Value(), BT_PACKAGE_TIMEOUT);
+			this.sendEmptyMessageDelayed(BtServiceCommand.TIMEOUT.Value(),
+					BT_PACKAGE_TIMEOUT);
 
 			// Send command and set a timeout
-			//logInfo("Send command: " + winschCmd.toString());
+			logInfo("Send command: " + Command.values()[tx_bytes[0]].toString());
 
-			//tx_bytes[0] = winschCmd.getByte();
+			// tx_bytes[0] = winschCmd.getByte();
 			if (msg_command == BtServiceCommand.SETP) {
 				btWrite(tx_bytes);
 			} else {
@@ -640,7 +693,6 @@ public class BTService extends Service {
 			}
 
 		}
-
 
 		/**
 		 * Send response SAMPLE_RECEIVED or PACKAGE_RECEIVED to client.
@@ -652,16 +704,16 @@ public class BTService extends Service {
 
 			if (bytesRead == Sample.BYTE_SIZE) {
 				logInfo("Sample received.");
-				SendClientMessage(BtServiceResponse.SAMPLE_RECEIVED, bytes);
+				tellClient(BtServiceResponse.SAMPLE_RECEIVED, bytes);
 			} else if (bytesRead == Parameter.BYTE_SIZE) {
 				logInfo("Parameter received.");
-				SendClientMessage(BtServiceResponse.PARAMETER_RECEIVED, bytes);
+				tellClient(BtServiceResponse.PARAMETER_RECEIVED, bytes);
 			} else {
-				Log.e(this.getClass().getSimpleName(), "Corrupted data received.");
+				Log.e(this.getClass().getSimpleName(),
+						"Corrupted data received.");
 			}
 
 		}
-
 
 		/**
 		 * Skip all bytes in bluetooth input stream.
@@ -671,16 +723,16 @@ public class BTService extends Service {
 			long skipped = 0;
 
 			try {
-				bytesAvailable = bt_instream.available();
+				bytesAvailable = btInstream.available();
 				while (bytesAvailable > 0) {
-					skipped += bt_instream.skip(bytesAvailable);
+					skipped += btInstream.skip(bytesAvailable);
 					try {
 						Thread.sleep(10);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 						break;
 					}
-					bytesAvailable = bt_instream.available();
+					bytesAvailable = btInstream.available();
 				}
 
 			} catch (IOException e) {
@@ -690,18 +742,19 @@ public class BTService extends Service {
 			}
 
 			if (skipped > 0) {
-				Log.d("btSkipInput", String.format("Skipped %d bytes.", skipped));
+				Log.d("btSkipInput",
+						String.format("Skipped %d bytes.", skipped));
 			}
 
 		}
-
 
 		/**
 		 * Read serial data from the bluetooth.
 		 * 
 		 * Method attempt to place bytesToRead number of bytes into btRxBuffer.
-		 * If available byte in the input stream > bytesToRead then excessive bytes are skipped from
-		 * the start of the stream before filling btRxBuffer.
+		 * If available byte in the input stream > bytesToRead then excessive
+		 * bytes are skipped from the start of the stream before filling
+		 * btRxBuffer.
 		 * 
 		 * @return True when the number of bytes fill data package raw buffer.
 		 */
@@ -710,8 +763,8 @@ public class BTService extends Service {
 			int remains = bytesToRead - bytesRead;
 
 			try {
-				bytesAvailable = bt_instream.available();
-				bytesRead += bt_instream.read(btRxBuffer, bytesRead,
+				bytesAvailable = btInstream.available();
+				bytesRead += btInstream.read(btRxBuffer, bytesRead,
 						Math.min(bytesAvailable, remains));
 
 			} catch (IOException e) {
@@ -724,25 +777,25 @@ public class BTService extends Service {
 			return (bytesRead == bytesToRead);
 		}
 
-		
 		/**
 		 * Write byte array to bluetooth.
 		 * 
-		 * @param tx_bytes Byte array.
-		 * @param len Number of bytes to write.
+		 * @param tx_bytes
+		 *            Byte array.
+		 * @param len
+		 *            Number of bytes to write.
 		 * @return False if there was an IO exception..
 		 */
 		public boolean btWrite(byte[] tx_bytes, int len) {
 			try {
-				bt_outstream.write(tx_bytes, 0, len);
-				bt_outstream.flush();
+				btOutstream.write(tx_bytes, 0, len);
+				btOutstream.flush();
 			} catch (IOException e) {
 				e.printStackTrace();
 				return false;
 			}
 			return true;
 		}
-
 
 		/**
 		 * Write bytes to bluetooth.
@@ -754,9 +807,6 @@ public class BTService extends Service {
 			return btWrite(tx_bytes, tx_bytes.length);
 		}
 
-
-		
-		
 		/**
 		 * Write a single byte to bluetooth.
 		 * 
@@ -768,5 +818,45 @@ public class BTService extends Service {
 		}
 
 	};
+
+	static private class BtResponseStoreHandler extends Handler {
+		public void handleMessage(Message msg) {
+
+			// TODO Messages from bt service should be passed to BaseAct too...
+			// This is ugly.
+			BtServiceResponse reported_state = BtServiceResponse.get(msg.what);
+
+			// logTxt("State: " + reported_state.toString());
+
+			switch (reported_state) {
+			case STATE_SAMPELS:
+				break;
+			case STATE_SYNCS:
+			case STATE_CONNECTED:
+			case STATE_DISCONNECTED:
+			case PACKAGE_TIMEOUT:
+			case PARAMETER_RECEIVED:
+			case ANS_TXT:
+				// case HANDLER_SET:
+				// case HANDLER_UNSET:
+				break;
+			case STATE_STOPPED:
+				sampleStore.stopWrite();
+				break;
+
+			case SAMPLE_RECEIVED:
+				if (!sampleStore.isWriting()) {
+					sampleStore.startWrite();
+				}
+
+				Sample sam = new Sample();
+				sam.LoadBytes((byte[]) msg.obj);
+
+				sampleStore.add(sam);
+
+				break;
+			}
+		}
+	}
 
 }

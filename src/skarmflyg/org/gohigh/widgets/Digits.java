@@ -154,7 +154,7 @@ public class Digits extends View {
 					try {
 						Thread.sleep(REFRESH_INTERVALL);
 					} catch (InterruptedException e) {
-						e.printStackTrace();
+						//e.printStackTrace();
 						return;
 					}
 				}

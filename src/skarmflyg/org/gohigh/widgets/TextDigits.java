@@ -25,21 +25,18 @@ public class TextDigits extends TextView {
 	public TextDigits(Context context) {
 		super(context);
 		init(null, 0);
-		// TODO Auto-generated constructor stub
 	}
 
 
 	public TextDigits(Context context, AttributeSet attrs) {
 		super(context, attrs);
 		init(attrs, 0);
-		// TODO Auto-generated constructor stub
 	}
 
 
 	public TextDigits(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
 		init(attrs, defStyle);
-		// TODO Auto-generated constructor stub
 	}
 
 

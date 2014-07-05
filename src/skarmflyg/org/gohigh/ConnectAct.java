@@ -28,22 +28,16 @@ public class ConnectAct extends BaseAct {
 	static private Button viewBtnSettingAct;
 	static private ToggleButton viewBtnSync;
 
-	static private CharSequence txtBtServiceConnected = "_Service bound";
-	static private CharSequence txtBtServiceDisconnected = "_Service unbound";
-
-	static private ConnHandler btServiceHandler; // Message handler for bluetooth service
+	private BtResponseHandler btServiceHandler; // Message handler for
 
 
+	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		setContentView(R.layout.activity_connect);
 
 		// Create bluetooth service handler
-		btServiceHandler = new ConnHandler();
-
-		// Get texts
-		txtBtServiceConnected = getText(R.string.btservice_connected);
-		txtBtServiceDisconnected = getText(R.string.btservice_disconnected);
+		btServiceHandler = new BtResponseHandler();
 
 		// Get views
 		viewPressureGauge = (Meter) findViewById(id.meter1);
@@ -56,12 +50,20 @@ public class ConnectAct extends BaseAct {
 		viewBtnSettingAct = (Button) findViewById(id.btn_settings_act);
 
 		// Connect click listeners
-		viewBtnConnect.setOnClickListener(onClickConnectBtn);
-		viewBtnSample.setOnClickListener(onClickSampleBtn);  // setOnClickListener(onClickSampleBtn);
-		viewBtnSync.setOnClickListener(onClickSyncBtn);
+		viewBtnConnect.setOnClickListener(on.clickConnectBtn);
+		viewBtnSample.setOnClickListener(on.clickSampleBtn); // setOnClickListener(onClickSampleBtn);
+		viewBtnSync.setOnClickListener(on.clickSyncBtn);
 		viewBtnSettingAct.setOnClickListener(new OnClickListener() {
 			public void onClick(View v) {
 				goSettings();
+			}
+		});
+
+		viewPressureGauge.setOnClickListener(new OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				goGraph();
 			}
 		});
 
@@ -69,38 +71,39 @@ public class ConnectAct extends BaseAct {
 
 	}
 
-
 	@Override
-	protected void onDestroy() {
+	public void onBackPressed() {
+		// Only stop service when going back from ConnectAct.
 		stopService(serviceIntent);
-		serviceIntent = null;
-		super.onDestroy();
+		super.onBackPressed();
 	}
 
+	public void goGraph() {
+		startActivity(new Intent(this, SampleAct.class));
+	}
 
 	public void goSettings() {
 		startActivity(new Intent(this, ParameterAct.class));
 	}
-
 
 	@Override
 	TextView getTextView() {
 		return (TextView) findViewById(id.txt_log);
 	}
 
-
 	@Override
-	Handler getBtServiceHandler() {
+	Handler getBtResponseHandler() {
 		return btServiceHandler;
 	}
 
-	static class ConnHandler extends Handler {
+	static private class BtResponseHandler extends Handler {
 		public void handleMessage(Message msg) {
 
-			// TODO Messages from bt service should be passed to BaseAct too... This is ugly.
-			reported_state = BtServiceResponse.get(msg.what);
+			// TODO Messages from bt service should be passed to BaseAct too...
+			// This is ugly.
+			BtServiceResponse reported_state = BtServiceResponse.get(msg.what);
 
-			switch (BtServiceResponse.get(msg.what)) {
+			switch (reported_state) {
 			case STATE_DISCONNECTED:
 				logTxt("Bluetooth nerkopplad.");
 				viewBtnConnect.setChecked(false);
@@ -136,13 +139,13 @@ public class ConnectAct extends BaseAct {
 				viewBtnSettingAct.setVisibility(View.INVISIBLE);
 				break;
 
-			case HANDLER_SET:
-				logTxt(txtBtServiceConnected.toString());
-				break;
-
-			case HANDLER_UNSET:
-				logTxt(txtBtServiceDisconnected.toString());
-				break;
+//			case HANDLER_SET:
+//				logTxt(txtBtServiceConnected.toString());
+//				break;
+//
+//			case HANDLER_UNSET:
+//				logTxt(txtBtServiceDisconnected.toString());
+//				break;
 
 			case PACKAGE_TIMEOUT:
 				logTxt("Package timeout.");
@@ -184,7 +187,6 @@ public class ConnectAct extends BaseAct {
 
 	};
 
-
 	static private void zeroMeters() {
 		viewTempDigits.setTargetVal(0);
 		viewDrumDigits.setTargetVal(0);
@@ -192,7 +194,6 @@ public class ConnectAct extends BaseAct {
 		viewPressureGauge.setTargetVal(0);
 
 	}
-
 
 	static private void applyParameters() {
 		short i = 0;

@@ -9,8 +9,6 @@ import android.os.Handler;
 import android.os.Message;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.View.OnClickListener;
-import android.view.View.OnKeyListener;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
@@ -24,15 +22,15 @@ public class ParameterAct extends BaseAct {
 	private static EditText viewEditValue;
 	private static Parameter param;
 
-	static private ConnHandler btServiceHandler; // Message handler for bluetooth service
-
+	static private BtResponseHandler btServiceHandler; // Message handler for
+														// bluetooth service
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		setContentView(R.layout.activity_parameter);
 
 		// Create bluetooth service handler
-		btServiceHandler = new ConnHandler();
+		btServiceHandler = new BtResponseHandler();
 
 		// Get views
 		viewBtnSet = (Button) findViewById(id.btn_set);
@@ -42,16 +40,15 @@ public class ParameterAct extends BaseAct {
 		viewEditValue.setRawInputType(Configuration.KEYBOARD_12KEY);
 
 		// Connect click listeners
-		viewBtnSet.setOnClickListener(onClickSetBtn);
-		viewBtnUp.setOnClickListener(onClickUpBtn);
-		viewBtnDown.setOnClickListener(onClickDownBtn);
+		viewBtnSet.setOnClickListener(on.clickSetBtn);
+		viewBtnUp.setOnClickListener(on.clickUpBtn);
+		viewBtnDown.setOnClickListener(on.clickDownBtn);
 
 		viewEditValue.setOnEditorActionListener(onEditValueEntered);
 
 		super.onCreate(savedInstanceState);
 
 	}
-
 
 	private void param_set() {
 		short val;
@@ -85,7 +82,6 @@ public class ParameterAct extends BaseAct {
 
 	};
 
-
 	// @Override
 	// protected void onResume() {
 	// setHandler(new ConnHandler());
@@ -97,18 +93,17 @@ public class ParameterAct extends BaseAct {
 		return (TextView) findViewById(id.txt_log);
 	}
 
-
 	@Override
-	Handler getBtServiceHandler() {
+	Handler getBtResponseHandler() {
 		return btServiceHandler;
 	}
 
-	static class ConnHandler extends Handler {
+	static private class BtResponseHandler extends Handler {
 		public void handleMessage(Message msg) {
 
-			// TODO Messages from bt service should be passed to BaseAct too... This is ugly.
-			reported_state = BtServiceResponse.get(msg.what);
-			// param = null;
+			// TODO Messages from bt service should be passed to BaseAct too...
+			// This is ugly.
+			BtServiceResponse reported_state = BtServiceResponse.get(msg.what);
 
 			switch (reported_state) {
 			case STATE_SAMPELS:
@@ -146,7 +141,8 @@ public class ParameterAct extends BaseAct {
 
 				// String format =
 				// "%s\nLäge.......: %d\nVärde......: %d\nGräns (min,max): (%d,%d)\nMapp (lo,hi): (%d,%d)";
-				// return String.format(format, param.descr, param.mode.toString(), val, low, high,
+				// return String.format(format, param.descr,
+				// param.mode.toString(), val, low, high,
 				// low_map, high_map);
 
 				logTxtSet(param.toStringMapped());
@@ -156,8 +152,8 @@ public class ParameterAct extends BaseAct {
 				logTxt(msg.obj.toString());
 				break;
 
-			case HANDLER_SET:
-			case HANDLER_UNSET:
+//			case HANDLER_SET:
+//			case HANDLER_UNSET:
 			case SAMPLE_RECEIVED:
 				break;
 			}
