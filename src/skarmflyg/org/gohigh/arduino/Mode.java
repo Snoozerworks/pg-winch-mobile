@@ -1,8 +1,7 @@
 package skarmflyg.org.gohigh.arduino;
 
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
+import android.util.SparseArray;
 
 public enum Mode {
 	NOMODE((byte) 0x00), // Undefined mode.
@@ -13,14 +12,15 @@ public enum Mode {
 	TOWING((byte) 0x05); // In towing operation (lever not in neutral)
 
 	private byte byteVal;
+
 	// Lookup table
-	private static final Map<Byte, Mode> lookup = new HashMap<Byte, Mode>();
+	private static final SparseArray<Mode> lookup = new SparseArray<Mode>();
+
 	// Populate the lookup table on loading time
 	static {
 		for (Mode s : EnumSet.allOf(Mode.class))
-			lookup.put(s.getByte(), s);
+			lookup.append(s.getByte(), s);
 	}
-
 
 	/**
 	 * Constructor
@@ -31,20 +31,18 @@ public enum Mode {
 		byteVal = mode;
 	}
 
-
 	public byte getByte() {
 		return byteVal;
 	}
-
 
 	public Boolean equals(byte b) {
 		return b == byteVal;
 	}
 
-
 	// This method can be used for reverse lookup purpose
 	public static Mode get(byte mode) {
-		Mode m = lookup.get(mode);
+		// Mode m = lookup.get(mode);
+		Mode m = (Mode) lookup.get(mode);
 		return (m == null) ? NOMODE : m;
 	}
 

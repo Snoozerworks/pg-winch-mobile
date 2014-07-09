@@ -3,13 +3,14 @@ package skarmflyg.org.gohigh;
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
-import skarmflyg.org.gohigh.btservice.BtServiceResponse;
+import skarmflyg.org.gohigh.btservice.BtServiceListener;
+import skarmflyg.org.gohigh.btservice.BtServiceStatus;
 import skarmflyg.org.gohigh.widgets.Digits;
 import skarmflyg.org.gohigh.widgets.Meter;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
+import android.os.IBinder;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -18,28 +19,26 @@ import android.widget.ToggleButton;
 
 public class ConnectAct extends BaseAct {
 
-	static private Meter viewPressureGauge;
-	static private Digits viewTempDigits;
-	static private Digits viewDrumDigits;
-	static private Digits viewPumpDigits;
+	private Meter viewPressureGauge;
+	private Digits viewTempDigits;
+	private Digits viewDrumDigits;
+	private Digits viewPumpDigits;
 
-	static private ToggleButton viewBtnConnect;
-	static private ToggleButton viewBtnSample;
-	static private Button viewBtnSettingAct;
-	static private ToggleButton viewBtnSync;
+	private ToggleButton viewBtnConnect;
+	private ToggleButton viewBtnSample;
+	private Button viewBtnSettingAct;
+	private ToggleButton viewBtnSync;
 
-	private BtResponseHandler btServiceHandler; // Message handler for
+	private TextView txt;
 
+	private BtServiceListener listener;
 
-	
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		setContentView(R.layout.activity_connect);
 
-		// Create bluetooth service handler
-		btServiceHandler = new BtResponseHandler();
-
 		// Get views
+		txt = (TextView) findViewById(id.txt_log);
 		viewPressureGauge = (Meter) findViewById(id.meter1);
 		viewTempDigits = (Digits) findViewById(id.temperature);
 		viewDrumDigits = (Digits) findViewById(id.drum_spd);
@@ -67,6 +66,8 @@ public class ConnectAct extends BaseAct {
 			}
 		});
 
+		listener = new ServiceListener();
+
 		super.onCreate(savedInstanceState);
 
 	}
@@ -91,21 +92,82 @@ public class ConnectAct extends BaseAct {
 		return (TextView) findViewById(id.txt_log);
 	}
 
-	@Override
-	Handler getBtResponseHandler() {
-		return btServiceHandler;
+	private void zeroMeters() {
+		viewTempDigits.setTargetVal(0);
+		viewDrumDigits.setTargetVal(0);
+		viewTempDigits.setTargetVal(0);
+		viewPressureGauge.setTargetVal(0);
+
 	}
 
-	static private class BtResponseHandler extends Handler {
-		public void handleMessage(Message msg) {
+	private void applyParameters() {
+		Parameter p;
 
-			// TODO Messages from bt service should be passed to BaseAct too...
-			// This is ugly.
-			BtServiceResponse reported_state = BtServiceResponse.get(msg.what);
+		p = btService.getParameter(Sample.PARAM_INDEX_DRUM);
+		if (null != p) {
+			viewDrumDigits.mapping.setHighWarning(p.val);
+			viewDrumDigits.mapping.setMapping(p);
+		}
 
-			switch (reported_state) {
+		p = btService.getParameter(Sample.PARAM_INDEX_PUMP);
+		if (null != p) {
+			viewPumpDigits.mapping.setHighWarning(p.val);
+			viewPumpDigits.mapping.setMapping(p);
+
+		}
+
+		p = btService.getParameter(Sample.PARAM_INDEX_TEMP);
+		if (null != p) {
+			viewTempDigits.mapping.setHighWarning(p.val);
+			viewTempDigits.mapping.setMapping(p);
+
+		}
+
+		p = btService.getParameter((byte) 3);
+		if (null != p) {
+			viewTempDigits.mapping.setLowWarning(p.val);
+		}
+
+	}
+
+	@Override
+	BtServiceListener getBtListener() {
+		return listener;
+	}
+
+	/**
+	 * Handle BtService events.
+	 * 
+	 * @author markus
+	 * 
+	 */
+	private class ServiceListener implements BtServiceListener {
+
+		@Override
+		public void onSampleReceived(Sample s) {
+			logTxtSet(txt, s.toString());
+			viewPressureGauge.setTargetVal(s.pres);
+			viewTempDigits.setTargetVal(s.temp);
+			viewDrumDigits.setTargetVal(s.tach_drum);
+			viewPumpDigits.setTargetVal(s.tach_pump);
+		}
+
+		@Override
+		public void onParameterReceived(Parameter param) {
+			logTxtSet(txt, param.toString());
+			applyParameters();
+		}
+
+		@Override
+		public void onText(CharSequence s) {
+			logTxt(txt, s.toString());
+		}
+
+		@Override
+		public void onStatusChange(BtServiceStatus status) {
+			switch (status) {
 			case STATE_DISCONNECTED:
-				logTxt("Bluetooth nerkopplad.");
+				logTxt(txt, "Bluetooth nerkopplad.");
 				viewBtnConnect.setChecked(false);
 				viewBtnSample.setVisibility(View.INVISIBLE);
 				viewBtnSync.setVisibility(View.INVISIBLE);
@@ -114,7 +176,7 @@ public class ConnectAct extends BaseAct {
 
 			case STATE_CONNECTED:
 				viewBtnConnect.setChecked(true);
-				logTxt("Bluetooth uppkopplad.");
+				logTxt(txt, "Bluetooth uppkopplad.");
 
 			case STATE_STOPPED:
 				viewBtnSample.setVisibility(View.VISIBLE);
@@ -139,85 +201,27 @@ public class ConnectAct extends BaseAct {
 				viewBtnSettingAct.setVisibility(View.INVISIBLE);
 				break;
 
-//			case HANDLER_SET:
-//				logTxt(txtBtServiceConnected.toString());
-//				break;
-//
-//			case HANDLER_UNSET:
-//				logTxt(txtBtServiceDisconnected.toString());
-//				break;
-
-			case PACKAGE_TIMEOUT:
-				logTxt("Package timeout.");
-				break;
-
-			case PARAMETER_RECEIVED:
-				Parameter param = new Parameter();
-				param.LoadBytes((byte[]) msg.obj);
-				if (parameters.get(param.index) != null) {
-					stopGetting();
-					logTxt("Parameters synronized.");
-					applyParameters();
-
-				} else {
-					logTxtSet(param.toString());
-					parameters.put(param);
-				}
-				break;
-
-			case SAMPLE_RECEIVED:
-				Sample sam = new Sample();
-				sam.LoadBytes((byte[]) msg.obj);
-				logTxtSet(sam.toString());
-				viewPressureGauge.setTargetVal(sam.pres);
-				viewTempDigits.setTargetVal(sam.temp);
-				viewDrumDigits.setTargetVal(sam.tach_drum);
-				viewPumpDigits.setTargetVal(sam.tach_pump);
-				break;
-
-			case ANS_TXT:
-				logTxt(msg.obj.toString());
-				break;
-
 			default:
 				break;
 			}
 
-		};
-
-	};
-
-	static private void zeroMeters() {
-		viewTempDigits.setTargetVal(0);
-		viewDrumDigits.setTargetVal(0);
-		viewTempDigits.setTargetVal(0);
-		viewPressureGauge.setTargetVal(0);
-
-	}
-
-	static private void applyParameters() {
-		short i = 0;
-		Parameter p;
-		while ((p = parameters.get(i++)) != null) {
-			switch (p.index) {
-			case 0:
-				viewDrumDigits.mapping.setHighWarning(p.val);
-				viewDrumDigits.mapping.setMapping(p);
-				break;
-			case 1:
-				viewPumpDigits.mapping.setHighWarning(p.val);
-				viewPumpDigits.mapping.setMapping(p);
-				break;
-			case 2:
-				viewTempDigits.mapping.setHighWarning(p.val);
-				viewTempDigits.mapping.setMapping(p);
-				break;
-			case 3:
-				viewTempDigits.mapping.setLowWarning(p.val);
-				break;
-			}
 		}
 
-	}
+		@Override
+		public void onPackageTimeout() {
+			logTxt(txt, "Package timeout");
 
+		}
+
+		@Override
+		public void onConnectionTimeout() {
+			logTxt(txt, "Connection timeout");
+		}
+	};
+
+	@Override
+	public void onServiceConnected(ComponentName className, IBinder binder) {
+		super.onServiceConnected(className, binder);
+
+	}
 }

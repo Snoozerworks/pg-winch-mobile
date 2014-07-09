@@ -2,11 +2,11 @@ package skarmflyg.org.gohigh;
 
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
-import skarmflyg.org.gohigh.btservice.BtServiceResponse;
+import skarmflyg.org.gohigh.arduino.Sample;
+import skarmflyg.org.gohigh.btservice.BtServiceListener;
+import skarmflyg.org.gohigh.btservice.BtServiceStatus;
 import android.content.res.Configuration;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
@@ -21,18 +21,19 @@ public class ParameterAct extends BaseAct {
 	private static Button viewBtnDown;
 	private static EditText viewEditValue;
 	private static Parameter param;
+	private TextView txt;
 
-	static private BtResponseHandler btServiceHandler; // Message handler for
-														// bluetooth service
+	private BtServiceListener listener;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		setContentView(R.layout.activity_parameter);
 
-		// Create bluetooth service handler
-		btServiceHandler = new BtResponseHandler();
+		// Create listener
+		listener = new ServiceListener();
 
 		// Get views
+		txt = (TextView) findViewById(id.txt_log);
 		viewBtnSet = (Button) findViewById(id.btn_set);
 		viewBtnUp = (Button) findViewById(id.btn_up);
 		viewBtnDown = (Button) findViewById(id.btn_down);
@@ -43,7 +44,6 @@ public class ParameterAct extends BaseAct {
 		viewBtnSet.setOnClickListener(on.clickSetBtn);
 		viewBtnUp.setOnClickListener(on.clickUpBtn);
 		viewBtnDown.setOnClickListener(on.clickDownBtn);
-
 		viewEditValue.setOnEditorActionListener(onEditValueEntered);
 
 		super.onCreate(savedInstanceState);
@@ -82,32 +82,42 @@ public class ParameterAct extends BaseAct {
 
 	};
 
-	// @Override
-	// protected void onResume() {
-	// setHandler(new ConnHandler());
-	// super.onResume();
-	// }
-
 	@Override
 	TextView getTextView() {
 		return (TextView) findViewById(id.txt_log);
 	}
 
 	@Override
-	Handler getBtResponseHandler() {
-		return btServiceHandler;
+	BtServiceListener getBtListener() {
+		return listener;
 	}
 
-	static private class BtResponseHandler extends Handler {
-		public void handleMessage(Message msg) {
+	private class ServiceListener implements BtServiceListener {
 
-			// TODO Messages from bt service should be passed to BaseAct too...
-			// This is ugly.
-			BtServiceResponse reported_state = BtServiceResponse.get(msg.what);
+		@Override
+		public void onText(CharSequence s) {
+			logTxt(txt, s.toString());
+		}
 
-			switch (reported_state) {
-			case STATE_SAMPELS:
-			case STATE_SYNCS:
+		@Override
+		public void onSampleReceived(Sample s) {
+		}
+
+		@Override
+		public void onParameterReceived(Parameter p) {
+			viewEditValue.setText(String.format("%.1f", p.val_map));
+			logTxtSet(txt, p.toStringMapped());
+		}
+
+		@Override
+		public void onStatusChange(BtServiceStatus status) {
+			switch (status) {
+			case STATE_CONNECTED:
+				logTxt(txt, "Bluetooth uppkopplad.");
+				break;
+
+			case STATE_DISCONNECTED:
+				logTxt(txt, "Bluetooth nerkopplad.");
 				viewBtnSet.setVisibility(View.INVISIBLE);
 				viewBtnUp.setVisibility(View.INVISIBLE);
 				viewBtnDown.setVisibility(View.INVISIBLE);
@@ -119,46 +129,29 @@ public class ParameterAct extends BaseAct {
 				viewBtnDown.setVisibility(View.VISIBLE);
 				break;
 
-			case STATE_CONNECTED:
-				logTxt("Bluetooth uppkopplad.");
-				break;
-
-			case STATE_DISCONNECTED:
-				logTxt("Bluetooth nerkopplad.");
+			case STATE_SAMPELS:
+			case STATE_SYNCS:
 				viewBtnSet.setVisibility(View.INVISIBLE);
 				viewBtnUp.setVisibility(View.INVISIBLE);
 				viewBtnDown.setVisibility(View.INVISIBLE);
 				break;
 
-			case PACKAGE_TIMEOUT:
-				logTxtSet("Package timeout.");
-				break;
-
-			case PARAMETER_RECEIVED:
-				param = new Parameter();
-				param.LoadBytes((byte[]) msg.obj);
-				viewEditValue.setText(String.format("%.1f", param.val_map));
-
-				// String format =
-				// "%s\nLäge.......: %d\nVärde......: %d\nGräns (min,max): (%d,%d)\nMapp (lo,hi): (%d,%d)";
-				// return String.format(format, param.descr,
-				// param.mode.toString(), val, low, high,
-				// low_map, high_map);
-
-				logTxtSet(param.toStringMapped());
-				break;
-
-			case ANS_TXT:
-				logTxt(msg.obj.toString());
-				break;
-
-//			case HANDLER_SET:
-//			case HANDLER_UNSET:
-			case SAMPLE_RECEIVED:
+			default:
 				break;
 			}
 
-		};
-	};
+		}
+
+		@Override
+		public void onPackageTimeout() {
+			logTxt(txt, "Package timeout");
+		}
+
+		@Override
+		public void onConnectionTimeout() {
+			logTxt(txt, "Connection timeout");
+		}
+
+	}
 
 }

@@ -1,51 +1,41 @@
 package skarmflyg.org.gohigh;
 
 import java.text.DecimalFormat;
-
 import com.androidplot.xy.BoundaryMode;
 import com.androidplot.xy.LineAndPointFormatter;
 import com.androidplot.xy.XYPlot;
 import com.androidplot.xy.XYStepMode;
 import skarmflyg.org.gohigh.R.id;
+import skarmflyg.org.gohigh.arduino.Parameter;
+import skarmflyg.org.gohigh.arduino.Sample;
 import skarmflyg.org.gohigh.btservice.BTService;
-import skarmflyg.org.gohigh.btservice.BtServiceResponse;
+import skarmflyg.org.gohigh.btservice.BtServiceListener;
+import skarmflyg.org.gohigh.btservice.BtServiceStatus;
 import skarmflyg.org.gohigh.btservice.SampleStore;
+import skarmflyg.org.gohigh.btservice.SampleStore.SampleXYSeries;
+import android.content.ComponentName;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
+import android.os.IBinder;
 import android.widget.TextView;
 
 public class SampleAct extends BaseAct {
 
-	// private static final int GRAPH_SAMPEL_COUNT = 50;
-	// private static final int FILE_SAMPEL_COUNT = 1500;
+	private com.androidplot.xy.XYPlot dynamicPlot;
+	private TextView txt;
+	private BtServiceListener listener;
+	private SampleXYSeries drumSeries;
+	private SampleXYSeries pumpSeries;
+	private SampleXYSeries tempSeries;
 
-	private static com.androidplot.xy.XYPlot dynamicPlot;
-
-	// private static SampleStoreFile sampel_data;
-
-	private BtResponseHandler btResponesHandler;
+	// private SampleXYSeries presSeries;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		setContentView(R.layout.activity_sample);
-
-		// Create bluetooth service handler
-		btResponesHandler = new BtResponseHandler();
+		super.onCreate(savedInstanceState);
 
 		dynamicPlot = (XYPlot) findViewById(id.chart);
-
-		// Create data series
-		// sampel_data = new SampleStoreFile(GRAPH_SAMPEL_COUNT,
-		// FILE_SAMPEL_COUNT);
-
-		// Add data series to plot
-		SampleStore sampel_data = btService.getSampleStore();
-		dynamicPlot.addSeries(sampel_data.getXYSeriesDrum(), //
-				new LineAndPointFormatter(Color.BLUE, null, null, null));
-		dynamicPlot.addSeries(sampel_data.getXYSeriesPump(), //
-				new LineAndPointFormatter(Color.RED, null, null, null));
 
 		// only display whole numbers in domain labels
 		dynamicPlot.getGraphWidget().setDomainValueFormat(
@@ -58,12 +48,27 @@ public class SampleAct extends BaseAct {
 
 		dynamicPlot.setTicksPerRangeLabel(3);
 
-		super.onCreate(savedInstanceState);
+		listener = new ServiceListener();
+
 	}
 
 	@Override
-	Handler getBtResponseHandler() {
-		return btResponesHandler;
+	public void onServiceConnected(ComponentName className, IBinder binder) {
+		super.onServiceConnected(className, binder);
+
+		// Add data series to plot
+		SampleStore sampel_data = btService.getSampleStore();
+
+		drumSeries = sampel_data.getXYSeriesDrum();
+		pumpSeries = sampel_data.getXYSeriesPump();
+		tempSeries = sampel_data.getXYSeriesTemp();
+
+		dynamicPlot.addSeries(drumSeries, //
+				new LineAndPointFormatter(Color.BLUE, null, null, null));
+		dynamicPlot.addSeries(pumpSeries, //
+				new LineAndPointFormatter(Color.RED, null, null, null));
+		dynamicPlot.addSeries(tempSeries, //
+				new LineAndPointFormatter(Color.RED, null, null, null));
 	}
 
 	@Override
@@ -71,32 +76,64 @@ public class SampleAct extends BaseAct {
 		return (TextView) findViewById(id.txt_log);
 	}
 
-	static private class BtResponseHandler extends Handler {
-		public void handleMessage(Message msg) {
-
-			// TODO Messages from bt service should be passed to BaseAct too...
-			// This is ugly.
-			BtServiceResponse reported_state = BtServiceResponse.get(msg.what);
-
-			// logTxt("State: " + reported_state.toString());
-
-			switch (reported_state) {
-			case STATE_SAMPELS:
-			case STATE_SYNCS:
-			case STATE_CONNECTED:
-			case STATE_DISCONNECTED:
-			case PACKAGE_TIMEOUT:
-			case PARAMETER_RECEIVED:
-			case ANS_TXT:
-			case STATE_STOPPED:
-				break;
-
-			case SAMPLE_RECEIVED:
-				dynamicPlot.redraw();
-
-				break;
-			}
-		}
+	@Override
+	BtServiceListener getBtListener() {
+		return listener;
 	}
+
+	/**
+	 * Handle BtService events.
+	 * 
+	 * @author markus
+	 * 
+	 */
+	private class ServiceListener implements BtServiceListener {
+
+		@Override
+		public void onText(CharSequence s) {
+			logTxt(txt, s.toString());
+		}
+
+		@Override
+		public void onSampleReceived(Sample s) {
+			dynamicPlot.redraw();
+		}
+
+		@Override
+		public void onParameterReceived(Parameter p) {
+
+			switch (p.index) {
+			case Sample.PARAM_INDEX_DRUM:
+				drumSeries.SetMapping(p);
+				break;
+
+			case Sample.PARAM_INDEX_PUMP:
+				pumpSeries.SetMapping(p);
+				break;
+
+			case Sample.PARAM_INDEX_TEMP:
+				tempSeries.SetMapping(p);
+				break;
+
+			}
+
+		}
+
+		@Override
+		public void onStatusChange(BtServiceStatus status) {
+			// TODO Auto-generated method stub
+		}
+
+		@Override
+		public void onPackageTimeout() {
+			logTxt(txt, "Package timeout");
+
+		}
+
+		@Override
+		public void onConnectionTimeout() {
+			logTxt(txt, "Connection timeout");
+		}
+	};
 
 }

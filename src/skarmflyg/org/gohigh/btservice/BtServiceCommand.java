@@ -1,48 +1,36 @@
 package skarmflyg.org.gohigh.btservice;
 
-import java.util.EnumSet;
-import android.util.SparseArray;
-
+/**
+ * Commands for the bluetooth service.
+ * 
+ * @author markus
+ * 
+ */
 public enum BtServiceCommand {
-	CONNECT, DISCONNECT, KILL, TIMEOUT, STOP, UP, DOWN, SELECT, SETP, //
+	CONNECT, DISCONNECT, // KILL, // TIMEOUT,
+	STOP, UP, DOWN, SELECT, SETP, //
 	GET_SAMPLE, GET_SAMPLES, GET_PARAMETER, GET_PARAMETERS, GET_STATE, _READ;
 
-	private int val;
-
-	// Lookup table
-	private static final SparseArray<BtServiceCommand> lookup = new SparseArray<BtServiceCommand>();
-
-	// Populate the lookup table on loading time
-	static {
-		for (BtServiceCommand s : EnumSet.allOf(BtServiceCommand.class))
-			lookup.put(s.Value(), s);
+	/**
+	 * Return the integer (ordinal) value.
+	 * 
+	 * @return
+	 */
+	public int toInt() {
+		return this.ordinal();
 	}
-
-
-	private BtServiceCommand() {
-		val = this.ordinal();
-	}
-
-
-	public int Value() {
-		return val;
-	}
-
 
 	/**
-	 * Lookup command given its value v. Returns null if v doesn't exist.
+	 * Given an integer (ordinal) value, return the enum.
 	 * 
-	 * @param v
-	 *            Command value
-	 * @return Command or null of not found
+	 * @return Enum or null if not found.
 	 */
-	static public BtServiceCommand get(int v) {
-		return lookup.get(v);
-	}
-
-
-	public boolean Equal(int v) {
-		return v == val;
+	static public BtServiceCommand toEnum(int ordinal) {
+		if (ordinal >= 0 && ordinal < BtServiceCommand.values().length) {
+			return BtServiceCommand.values()[ordinal];
+		} else {
+			return null;
+		}
 	}
 
 }

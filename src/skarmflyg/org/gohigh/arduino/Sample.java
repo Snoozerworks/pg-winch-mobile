@@ -1,5 +1,7 @@
 package skarmflyg.org.gohigh.arduino;
 
+import java.util.Arrays;
+
 /**
  * Objects of class Sample represents one sampled data from the winch.
  * 
@@ -8,6 +10,12 @@ package skarmflyg.org.gohigh.arduino;
  */
 public class Sample extends DataPackage {
 	static final public byte BYTE_SIZE = 11;
+
+	// Indices of parameters used for mapping.
+	static final public byte PARAM_INDEX_DRUM = 0;
+	static final public byte PARAM_INDEX_PUMP = 1;
+	static final public byte PARAM_INDEX_TEMP = 2;
+	// static final public byte PARAM_INDEX_PRES = ??;
 
 	// public short index;
 	public long time;
@@ -20,11 +28,17 @@ public class Sample extends DataPackage {
 		super(BYTE_SIZE);
 	}
 
-	/**
-	 * Load data from raw byte array.
-	 */
-	public void LoadBytes() {
-		// mode = Mode.values()[byte2short(raw[0])];
+	public Sample(byte[] raw_data) {
+		super(BYTE_SIZE);
+		this.LoadBytes(raw_data);
+	}
+
+	@Override
+	public void LoadBytes(byte[] bytearr) {
+		if (bytearr.length < BYTE_SIZE) {
+			return;
+		}
+		raw = Arrays.copyOf(bytearr, BYTE_SIZE);
 		mode = getMode(raw);
 		time = getTime(raw);
 		tach_pump = getTachPump(raw);
@@ -63,10 +77,11 @@ public class Sample extends DataPackage {
 		return String.format(format, mode.getByte(), time, tach_pump,
 				tach_drum, temp, pres);
 	}
-	
+
 	static public String csvHeaders() {
 		return "Mode,Time,Pump speed,Drum speed,Temperature,Pressure\n";
 	}
+
 	public String toCsv() {
 		String format = "%d,%d,%d,%d,%d,%d\n";
 		return String.format(format, mode.getByte(), time, tach_pump,
