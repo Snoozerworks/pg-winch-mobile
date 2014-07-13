@@ -8,9 +8,8 @@ import com.androidplot.xy.XYStepMode;
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
-import skarmflyg.org.gohigh.btservice.BTService;
 import skarmflyg.org.gohigh.btservice.BtServiceListener;
-import skarmflyg.org.gohigh.btservice.BtServiceStatus;
+import skarmflyg.org.gohigh.btservice.ServiceState;
 import skarmflyg.org.gohigh.btservice.SampleStore;
 import skarmflyg.org.gohigh.btservice.SampleStore.SampleXYSeries;
 import android.content.ComponentName;
@@ -28,52 +27,58 @@ public class SampleAct extends BaseAct {
 	private SampleXYSeries pumpSeries;
 	private SampleXYSeries tempSeries;
 
-	// private SampleXYSeries presSeries;
-
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		setContentView(R.layout.activity_sample);
+		txt = (TextView) findViewById(id.txt_log);
+
 		super.onCreate(savedInstanceState);
 
 		dynamicPlot = (XYPlot) findViewById(id.chart);
 
 		// only display whole numbers in domain labels
-		dynamicPlot.getGraphWidget().setDomainValueFormat(
-				new DecimalFormat("0"));
-		dynamicPlot.setRangeBoundaries(-256, 256, BoundaryMode.FIXED);
+		dynamicPlot.setDomainValueFormat(new DecimalFormat("0"));
+		dynamicPlot.setDomainStep(XYStepMode.INCREMENT_BY_VAL, 5);
 
-		dynamicPlot.setDomainStepValue(BTService.GRAPH_SAMPEL_COUNT);
-		dynamicPlot.setDomainStepMode(XYStepMode.SUBDIVIDE);
-		dynamicPlot.setTicksPerDomainLabel(2);
-
-		dynamicPlot.setTicksPerRangeLabel(3);
+		dynamicPlot.setRangeBoundaries(0, 1000, BoundaryMode.FIXED);
+		dynamicPlot.setRangeValueFormat(new DecimalFormat("0"));
+		dynamicPlot.setRangeStep(XYStepMode.INCREMENT_BY_VAL, 100);
+		dynamicPlot.setTicksPerRangeLabel(1);
 
 		listener = new ServiceListener();
-
 	}
 
 	@Override
 	public void onServiceConnected(ComponentName className, IBinder binder) {
 		super.onServiceConnected(className, binder);
 
-		// Add data series to plot
+		// Get data series
 		SampleStore sampel_data = btService.getSampleStore();
-
 		drumSeries = sampel_data.getXYSeriesDrum();
 		pumpSeries = sampel_data.getXYSeriesPump();
 		tempSeries = sampel_data.getXYSeriesTemp();
 
-		dynamicPlot.addSeries(drumSeries, //
-				new LineAndPointFormatter(Color.BLUE, null, null, null));
-		dynamicPlot.addSeries(pumpSeries, //
-				new LineAndPointFormatter(Color.RED, null, null, null));
-		dynamicPlot.addSeries(tempSeries, //
-				new LineAndPointFormatter(Color.RED, null, null, null));
+		// Add series to plot
+		LineAndPointFormatter drumFormat = new LineAndPointFormatter();
+		drumFormat.configure(getApplicationContext(), R.xml.plf);
+		drumFormat.getLinePaint().setColor(Color.RED);
+		dynamicPlot.addSeries(drumSeries, drumFormat);
+
+		LineAndPointFormatter pumpFormat = new LineAndPointFormatter();
+		pumpFormat.configure(getApplicationContext(), R.xml.plf);
+		pumpFormat.getLinePaint().setColor(Color.GREEN);
+		dynamicPlot.addSeries(pumpSeries, pumpFormat);
+
+		LineAndPointFormatter tempFormat = new LineAndPointFormatter();
+		tempFormat.configure(getApplicationContext(), R.xml.plf);
+		tempFormat.getLinePaint().setColor(Color.BLUE);
+		dynamicPlot.addSeries(tempSeries, tempFormat);
+
 	}
 
 	@Override
 	TextView getTextView() {
-		return (TextView) findViewById(id.txt_log);
+		return txt;
 	}
 
 	@Override
@@ -88,7 +93,7 @@ public class SampleAct extends BaseAct {
 	 * 
 	 */
 	private class ServiceListener implements BtServiceListener {
-
+		
 		@Override
 		public void onText(CharSequence s) {
 			logTxt(txt, s.toString());
@@ -97,31 +102,18 @@ public class SampleAct extends BaseAct {
 		@Override
 		public void onSampleReceived(Sample s) {
 			dynamicPlot.redraw();
+			long dt = btService.getSampleStore().getDeltaTime();
+			logTxtSet(txt, "period: " + Long.toString(dt) + "ms");
 		}
 
 		@Override
 		public void onParameterReceived(Parameter p) {
-
-			switch (p.index) {
-			case Sample.PARAM_INDEX_DRUM:
-				drumSeries.SetMapping(p);
-				break;
-
-			case Sample.PARAM_INDEX_PUMP:
-				pumpSeries.SetMapping(p);
-				break;
-
-			case Sample.PARAM_INDEX_TEMP:
-				tempSeries.SetMapping(p);
-				break;
-
-			}
-
+			// TODO Auto-generated method stub
 		}
 
 		@Override
-		public void onStatusChange(BtServiceStatus status) {
-			// TODO Auto-generated method stub
+		public void onStateChange(ServiceState state) {
+			logTxt(txt, "State changed to " + state.toString());
 		}
 
 		@Override
@@ -133,6 +125,17 @@ public class SampleAct extends BaseAct {
 		@Override
 		public void onConnectionTimeout() {
 			logTxt(txt, "Connection timeout");
+		}
+
+		@Override
+		public void onRecordStateChange(boolean is_recording) {
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public String getId() {
+			return "SampleActListener";
 		}
 	};
 

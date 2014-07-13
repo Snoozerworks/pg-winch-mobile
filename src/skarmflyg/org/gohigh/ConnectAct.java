@@ -3,14 +3,13 @@ package skarmflyg.org.gohigh;
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
+import skarmflyg.org.gohigh.btservice.BTService;
 import skarmflyg.org.gohigh.btservice.BtServiceListener;
-import skarmflyg.org.gohigh.btservice.BtServiceStatus;
+import skarmflyg.org.gohigh.btservice.ServiceState;
 import skarmflyg.org.gohigh.widgets.Digits;
 import skarmflyg.org.gohigh.widgets.Meter;
-import android.content.ComponentName;
 import android.content.Intent;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -19,7 +18,7 @@ import android.widget.ToggleButton;
 
 public class ConnectAct extends BaseAct {
 
-	private Meter viewPressureGauge;
+	private Meter viewForceMeter;
 	private Digits viewTempDigits;
 	private Digits viewDrumDigits;
 	private Digits viewPumpDigits;
@@ -39,7 +38,7 @@ public class ConnectAct extends BaseAct {
 
 		// Get views
 		txt = (TextView) findViewById(id.txt_log);
-		viewPressureGauge = (Meter) findViewById(id.meter1);
+		viewForceMeter = (Meter) findViewById(id.force_meter);
 		viewTempDigits = (Digits) findViewById(id.temperature);
 		viewDrumDigits = (Digits) findViewById(id.drum_spd);
 		viewPumpDigits = (Digits) findViewById(id.pump_spd);
@@ -58,8 +57,7 @@ public class ConnectAct extends BaseAct {
 			}
 		});
 
-		viewPressureGauge.setOnClickListener(new OnClickListener() {
-
+		viewForceMeter.setOnClickListener(new OnClickListener() {
 			@Override
 			public void onClick(View v) {
 				goGraph();
@@ -75,7 +73,8 @@ public class ConnectAct extends BaseAct {
 	@Override
 	public void onBackPressed() {
 		// Only stop service when going back from ConnectAct.
-		stopService(serviceIntent);
+		startService(new Intent(this, BTService.class)
+				.setAction(BTService.ACTION_KILL_SERVICE));
 		super.onBackPressed();
 	}
 
@@ -93,41 +92,10 @@ public class ConnectAct extends BaseAct {
 	}
 
 	private void zeroMeters() {
-		viewTempDigits.setTargetVal(0);
-		viewDrumDigits.setTargetVal(0);
-		viewTempDigits.setTargetVal(0);
-		viewPressureGauge.setTargetVal(0);
-
-	}
-
-	private void applyParameters() {
-		Parameter p;
-
-		p = btService.getParameter(Sample.PARAM_INDEX_DRUM);
-		if (null != p) {
-			viewDrumDigits.mapping.setHighWarning(p.val);
-			viewDrumDigits.mapping.setMapping(p);
-		}
-
-		p = btService.getParameter(Sample.PARAM_INDEX_PUMP);
-		if (null != p) {
-			viewPumpDigits.mapping.setHighWarning(p.val);
-			viewPumpDigits.mapping.setMapping(p);
-
-		}
-
-		p = btService.getParameter(Sample.PARAM_INDEX_TEMP);
-		if (null != p) {
-			viewTempDigits.mapping.setHighWarning(p.val);
-			viewTempDigits.mapping.setMapping(p);
-
-		}
-
-		p = btService.getParameter((byte) 3);
-		if (null != p) {
-			viewTempDigits.mapping.setLowWarning(p.val);
-		}
-
+		viewDrumDigits.setValue(0);
+		viewPumpDigits.setValue(0);
+		viewTempDigits.setValue(0);
+		viewForceMeter.setValue(0);
 	}
 
 	@Override
@@ -144,18 +112,46 @@ public class ConnectAct extends BaseAct {
 	private class ServiceListener implements BtServiceListener {
 
 		@Override
-		public void onSampleReceived(Sample s) {
-			logTxtSet(txt, s.toString());
-			viewPressureGauge.setTargetVal(s.pres);
-			viewTempDigits.setTargetVal(s.temp);
-			viewDrumDigits.setTargetVal(s.tach_drum);
-			viewPumpDigits.setTargetVal(s.tach_pump);
+		public void onSampleReceived(Sample sample) {
+			logTxtSet(txt, sample.toString());
+			long dt = btService.getSampleStore().getDeltaTime();
+			logTxt(txt, "\nperiod: " + Long.toString(dt) + "ms");
+
+			viewForceMeter.setTargetValue(sample.pres);
+			viewTempDigits.setTargetValue(sample.temp);
+			viewDrumDigits.setTargetValue(sample.tach_drum);
+			viewPumpDigits.setTargetValue(sample.tach_pump);
 		}
 
 		@Override
 		public void onParameterReceived(Parameter param) {
 			logTxtSet(txt, param.toString());
-			applyParameters();
+
+			switch (param.index) {
+			case Sample.PARAM_INDEX_DRUM:
+				viewDrumDigits.setMapping(param.getMapping());
+				viewDrumDigits.setHighWarning(param.val);
+				break;
+
+			case Sample.PARAM_INDEX_PUMP:
+				viewPumpDigits.setMapping(param.getMapping());
+				viewPumpDigits.setHighWarning(param.getMapping().mapInverse(
+						2600));
+				break;
+
+			case Sample.PARAM_INDEX_TEMP_HI:
+				viewTempDigits.setHighWarning(param.val);
+				viewTempDigits.setMapping(param.getMapping());
+				break;
+
+			case Sample.PARAM_INDEX_TEMP_LO:
+				viewTempDigits.setLowWarning(param.val);
+				break;
+
+			default:
+				break;
+			}
+
 		}
 
 		@Override
@@ -164,7 +160,7 @@ public class ConnectAct extends BaseAct {
 		}
 
 		@Override
-		public void onStatusChange(BtServiceStatus status) {
+		public void onStateChange(ServiceState status) {
 			switch (status) {
 			case STATE_DISCONNECTED:
 				logTxt(txt, "Bluetooth nerkopplad.");
@@ -217,11 +213,15 @@ public class ConnectAct extends BaseAct {
 		public void onConnectionTimeout() {
 			logTxt(txt, "Connection timeout");
 		}
-	};
 
-	@Override
-	public void onServiceConnected(ComponentName className, IBinder binder) {
-		super.onServiceConnected(className, binder);
+		@Override
+		public void onRecordStateChange(boolean is_recording) {
 
+		}
+
+		@Override
+		public String getId() {
+			return "ConnectActServiceListener";
+		}
 	}
 }

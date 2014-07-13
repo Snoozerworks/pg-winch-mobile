@@ -14,7 +14,8 @@ public class Sample extends DataPackage {
 	// Indices of parameters used for mapping.
 	static final public byte PARAM_INDEX_DRUM = 0;
 	static final public byte PARAM_INDEX_PUMP = 1;
-	static final public byte PARAM_INDEX_TEMP = 2;
+	static final public byte PARAM_INDEX_TEMP_HI = 2;
+	static final public byte PARAM_INDEX_TEMP_LO = 3;
 	// static final public byte PARAM_INDEX_PRES = ??;
 
 	// public short index;
@@ -30,11 +31,11 @@ public class Sample extends DataPackage {
 
 	public Sample(byte[] raw_data) {
 		super(BYTE_SIZE);
-		this.LoadBytes(raw_data);
+		this.loadBytes(raw_data);
 	}
 
 	@Override
-	public void LoadBytes(byte[] bytearr) {
+	public void loadBytes(byte[] bytearr) {
 		if (bytearr.length < BYTE_SIZE) {
 			return;
 		}
@@ -48,7 +49,7 @@ public class Sample extends DataPackage {
 	}
 
 	static public Mode getMode(byte[] raw) {
-		return Mode.get((byte) (raw[0] & 0xFF));
+		return Mode.toEnum((byte) (raw[0] & 0xFF));
 	}
 
 	static public long getTime(byte[] raw) {
@@ -79,7 +80,7 @@ public class Sample extends DataPackage {
 	}
 
 	static public String csvHeaders() {
-		return "Mode,Time,Pump speed,Drum speed,Temperature,Pressure\n";
+		return "mode,time,pump_speed_raw,drum_speed_raw,temp,pres\n";
 	}
 
 	public String toCsv() {

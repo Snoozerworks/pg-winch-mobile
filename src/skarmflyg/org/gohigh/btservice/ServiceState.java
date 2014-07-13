@@ -6,7 +6,7 @@ package skarmflyg.org.gohigh.btservice;
  * @author markus
  * 
  */
-public enum BtServiceStatus {
+public enum ServiceState {
 	STATE_CONNECTED, //
 	STATE_DISCONNECTED, //
 	STATE_SAMPELS, //
@@ -14,7 +14,7 @@ public enum BtServiceStatus {
 	STATE_STOPPED; //
 
 	// Unique number for this enum
-	public static final byte ENUM_TYPE = 1;
+	public static final byte ENUM_TYPE = 3;
 
 	/**
 	 * Return the integer (ordinal) value.
@@ -30,9 +30,9 @@ public enum BtServiceStatus {
 	 * 
 	 * @return Enum or null if not found.
 	 */
-	static public BtServiceStatus toEnum(int ordinal) {
-		if (ordinal >= 0 && ordinal < BtServiceStatus.values().length) {
-			return BtServiceStatus.values()[ordinal];
+	static public ServiceState toEnum(int ordinal) {
+		if (ordinal >= 0 && ordinal < ServiceState.values().length) {
+			return ServiceState.values()[ordinal];
 		} else {
 			return null;
 		}

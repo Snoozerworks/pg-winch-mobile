@@ -1,0 +1,11 @@
+<resources>
+
+    <string name="state_connected">Uppkopplad</string>
+    <string name="state_disconnected">Nedkopplad</string>
+    <string name="state_sampels">Läser</string>
+    <string name="state_syncs">Syncronizerar</string>
+    <string name="state_stopped">Avvaktar</string>
+    <string name="state_log_on">Loggning på</string>
+    <string name="state_log_off">Loggning av</string>
+
+</resources>

@@ -6,8 +6,15 @@
     android:layout_height="fill_parent"
     android:orientation="vertical" >
 
+    <!--
+    For 4-20mA 0-400bar pressure input;
+    982 = 240ohm*20mA / 5 * 1023 
+    196 = 240ohm*4mA / 5 * 1023
+    687 = warning at 250 bar 
+    -->
+
     <skarmflyg.org.gohigh.widgets.Meter
-        android:id="@+id/meter1"
+        android:id="@+id/force_meter"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
@@ -16,13 +23,13 @@
         custom:needle_min_ang="-120"
         custom:needle_min_val="128"
         custom:num_format="%3.0f"
-        custom:rate_limit="512"
-        custom:raw_hi="896"
-        custom:raw_lo="128"
-        custom:val_hi="110"
-        custom:val_lo="30"
-        custom:wrn_hi="896"
-        custom:wrn_lo="128" />
+        custom:rate_limit="20"
+        custom:raw_hi="982"
+        custom:raw_lo="196"
+        custom:val_hi="400"
+        custom:val_lo="0"
+        custom:wrn_hi="687"
+        custom:wrn_lo="180" />
 
     <TableLayout
         android:layout_width="wrap_content"
@@ -42,7 +49,7 @@
                 android:layout_marginLeft="3dp"
                 android:layout_marginRight="3dp"
                 custom:num_format="%3.1f"
-                custom:rate_limit="256"
+                custom:rate_limit="20"
                 custom:raw_hi="1023"
                 custom:raw_lo="0"
                 custom:val_hi="1023"
@@ -57,7 +64,7 @@
                 android:layout_marginLeft="3dp"
                 android:layout_marginRight="3dp"
                 custom:num_format="%3.0f"
-                custom:rate_limit="50"
+                custom:rate_limit="5"
                 custom:raw_hi="255"
                 custom:raw_lo="0"
                 custom:val_hi="255"
@@ -72,14 +79,13 @@
                 android:layout_marginLeft="3dp"
                 android:layout_marginRight="3dp"
                 custom:num_format="%3.0f"
-                custom:rate_limit="50"
+                custom:rate_limit="5"
                 custom:raw_hi="255"
                 custom:raw_lo="0"
                 custom:val_hi="255"
                 custom:val_lo="0"
                 custom:wrn_hi="60"
                 custom:wrn_lo="5" />
-
         </TableRow>
 
         <TableRow
@@ -107,7 +113,6 @@
                 android:layout_height="wrap_content"
                 android:contentDescription="@string/img_pump_speed"
                 android:src="@drawable/custom_pump_icon" />
-
         </TableRow>
     </TableLayout>
 
@@ -124,7 +129,6 @@
             android:text="@string/msg_connect_to_winch"
             android:textAppearance="?android:attr/textAppearanceMedium"
             android:typeface="monospace" />
-
     </ScrollView>
 
     <LinearLayout
@@ -136,6 +140,7 @@
             android:id="@+id/btn_connect"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
             android:textOff="@string/btn_connect_off"
             android:textOn="@string/btn_connect_on" />
 
@@ -143,6 +148,7 @@
             android:id="@+id/btn_log"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
             android:textOff="@string/btn_log_off"
             android:textOn="@string/btn_log_on" />
 
@@ -150,17 +156,16 @@
             android:id="@+id/btn_op_load"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
             android:textOff="@string/btn_sync_off"
-            android:textOn="@string/btn_sync_on"
-            android:visibility="visible" />
+            android:textOn="@string/btn_sync_on" />
 
         <Button
             android:id="@+id/btn_settings_act"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/btn_settings_act"
-            android:visibility="invisible" />
-
+            android:layout_gravity="center_vertical"
+            android:text="@string/btn_settings_act" />
     </LinearLayout>
 
 </LinearLayout>

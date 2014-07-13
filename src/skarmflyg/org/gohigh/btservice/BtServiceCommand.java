@@ -7,9 +7,9 @@ package skarmflyg.org.gohigh.btservice;
  * 
  */
 public enum BtServiceCommand {
-	CONNECT, DISCONNECT, // KILL, // TIMEOUT,
-	STOP, UP, DOWN, SELECT, SETP, //
-	GET_SAMPLE, GET_SAMPLES, GET_PARAMETER, GET_PARAMETERS, GET_STATE, _READ;
+	CONNECT, DISCONNECT, STOP, //
+	UP, DOWN, SELECT, SETP, //
+	GET_SAMPLE, GET_SAMPLES, GET_PARAMETERS, GET_STATE, _READ;
 
 	/**
 	 * Return the integer (ordinal) value.

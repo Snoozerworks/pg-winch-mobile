@@ -4,11 +4,11 @@
     <attr name="num_format" format="string" />
     <attr name="raw_hi" format="integer" />
     <attr name="raw_lo" format="integer" />
-    <attr name="val_hi" format="float" />
-    <attr name="val_lo" format="float" />
+    <attr name="val_hi" format="integer" />
+    <attr name="val_lo" format="integer" />
     <attr name="wrn_hi" format="integer" />
     <attr name="wrn_lo" format="integer" />
-    <attr name="rate_limit" format="float" />
+    <attr name="rate_limit" format="integer" />
 
     <declare-styleable name="Digits">
         <attr name="num_format" />
@@ -29,8 +29,8 @@
         <attr name="val_lo" />
         <attr name="wrn_lo" />
         <attr name="wrn_hi" />
-        <attr name="needle_min_ang" format="float" />
-        <attr name="needle_max_ang" format="float" />
+        <attr name="needle_min_ang" format="integer" />
+        <attr name="needle_max_ang" format="integer" />
         <attr name="needle_min_val" format="integer" />
         <attr name="needle_max_val" format="integer" />
     </declare-styleable>

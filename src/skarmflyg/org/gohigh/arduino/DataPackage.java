@@ -12,13 +12,14 @@ abstract public class DataPackage {
 	public byte[] raw;
 
 	public DataPackage(byte byte_size) {
+		mode = Mode.NOMODE;
 		raw = new byte[byte_size];
 	}
 
 	/**
 	 * Load data from raw byte array.
 	 */
-	abstract public void LoadBytes(byte[] bytearr);
+	abstract public void loadBytes(byte[] bytearr);
 
 	@Override
 	abstract public String toString();
@@ -37,13 +38,5 @@ abstract public class DataPackage {
 				((b3 & 0xFF) << 8) | //
 				(b4 & 0xFF);
 	}
-
-	// public int describeContents() {
-	// return 0;
-	// }
-
-	// public void writeToParcel(Parcel dest, int flags) {
-	// dest.writeByteArray(raw);
-	// }
 
 }

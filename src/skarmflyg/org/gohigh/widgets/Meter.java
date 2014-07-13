@@ -1,6 +1,10 @@
 package skarmflyg.org.gohigh.widgets;
 
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import skarmflyg.org.gohigh.R;
+import skarmflyg.org.gohigh.arduino.Mapping;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
@@ -18,8 +22,11 @@ import android.widget.ImageView;
 public class Meter extends ImageView {
 	public final int REFRESH_INTERVALL = 100;
 
-	public SensorMapping mapping;
-	private SensorMapping map_angle;
+	// Set cyclicRedraw to true if widget shall auto update periodically
+	public AtomicBoolean cyclicRedraw = new AtomicBoolean(false);
+
+	private InstrumentBase digitData = new InstrumentBase();
+	private InstrumentBase gaugeData = new InstrumentBase();
 
 	private final Paint paint = new Paint();
 	private final Paint paint_wrn = new Paint();
@@ -36,54 +43,58 @@ public class Meter extends ImageView {
 
 	private Thread updater_thread;
 
-
 	public Meter(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
 		init(context, attrs);
 	}
-
 
 	public Meter(Context context, AttributeSet attrs) {
 		super(context, attrs);
 		init(context, attrs);
 	}
 
-
 	public Meter(Context context) {
 		super(context);
-	}
 
+	}
 
 	private void init(Context context, AttributeSet attrs) {
 		Log.d(this.getClass().getSimpleName(), "init");
 
 		TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.Meter);
 
-		mapping = new SensorMapping(a.getInt(R.styleable.Meter_raw_lo, 0), //
-				a.getInt(R.styleable.Meter_raw_hi, 1023), //
-				a.getFloat(R.styleable.Meter_val_lo, 0), //
-				a.getFloat(R.styleable.Meter_val_hi, 120));
-		mapping.setChangeRate(a.getFloat(R.styleable.Meter_rate_limit, Float.MAX_VALUE)
-				* REFRESH_INTERVALL / 1000);
-		mapping.setLowWarning(a.getInt(R.styleable.Meter_wrn_lo, 0));
-		mapping.setHighWarning(a.getInt(R.styleable.Meter_wrn_hi, 1023));
-		mapping.format = a.getString(R.styleable.Meter_num_format);
+		// Setup data for the digit display
+		digitData.setMapping(new Mapping( //
+				a.getInt(R.styleable.Meter_raw_lo, 128), //
+				a.getInt(R.styleable.Meter_raw_hi, 896), //
+				a.getInt(R.styleable.Meter_val_lo, 0), //
+				a.getInt(R.styleable.Meter_val_hi, 110)));
+		digitData.setRateLimiter(new RateLimiter(a.getInt(
+				R.styleable.Meter_rate_limit, Integer.MAX_VALUE)));
+		digitData.setLowWarning(a.getInt(R.styleable.Meter_wrn_lo, 0));
+		digitData.setHighWarning(a.getInt(R.styleable.Meter_wrn_hi, 1023));
 
-		map_angle = new SensorMapping( //
+		// Setup data for the gauge display
+		gaugeData.setMapping(new Mapping( //
 				a.getInt(R.styleable.Meter_needle_min_val, 128), //
 				a.getInt(R.styleable.Meter_needle_max_val, 896), //
-				a.getFloat(R.styleable.Meter_needle_min_ang, -120), //
-				a.getFloat(R.styleable.Meter_needle_max_ang, 120));
-		map_angle.setChangeRate(a.getFloat(R.styleable.Meter_rate_limit, Float.MAX_VALUE)
-				* REFRESH_INTERVALL / 1000);
+				a.getInt(R.styleable.Meter_needle_min_ang, -120), //
+				a.getInt(R.styleable.Meter_needle_max_ang, 120)));
+		gaugeData.setRateLimiter(new RateLimiter(a.getInt(
+				R.styleable.Meter_rate_limit, Integer.MAX_VALUE)));
 
-		scale_bmp = BitmapFactory.decodeResource(getResources(), R.drawable.custom_meter_bg);
-		needle_bmp = BitmapFactory.decodeResource(getResources(), R.drawable.custom_needle);
+		a.recycle();
+
+		// Get bitmaps
+		scale_bmp = BitmapFactory.decodeResource(getResources(),
+				R.drawable.custom_meter_bg);
+		needle_bmp = BitmapFactory.decodeResource(getResources(),
+				R.drawable.custom_needle);
 
 		int sw = scale_bmp.getWidth();
 		int nw = needle_bmp.getWidth();
 
-		needle_pos[0] = (32 / 338f) * sw;	// Pivot point dx
+		needle_pos[0] = (32 / 338f) * sw; // Pivot point dx
 		needle_pos[1] = (149 / 338f) * sw;// Pivot point dy
 		needle_pos[2] = ((169 - 32) / 338f) * sw; // Translation point dx
 		needle_pos[3] = ((169 - 149) / 338f) * sw;// Translation point dy
@@ -100,20 +111,91 @@ public class Meter extends ImageView {
 
 		paint_wrn.setColor(Color.YELLOW);
 
-		a.recycle();
 	}
-
 
 	private RectF getRect(float left, float top, float witdh, float hight) {
 		return new RectF(left, top, left + witdh, top + hight);
 	}
 
-
-	public void setTargetVal(int v) {
-		mapping.setTargetVal(v);
-		map_angle.setTargetVal(v);
+	/**
+	 * Set mapping of input to output value.
+	 * 
+	 * @param m
+	 */
+	public void setMapping(Mapping m) {
+		digitData.setMapping(m);
 	}
 
+	public void setTargetValue(int v) {
+		digitData.setTargetValue(v);
+		gaugeData.setTargetValue(v);
+		if (!cyclicRedraw.get()) {
+			Meter.this.postInvalidate();
+		}
+	}
+
+	public void setValue(int v) {
+		digitData.setValue(v);
+		gaugeData.setValue(v);
+		if (!cyclicRedraw.get()) {
+			Meter.this.postInvalidate();
+		}
+	}
+
+	@Override
+	protected void onAttachedToWindow() {
+		super.onAttachedToWindow();
+
+		updater_thread = new Thread(new Runnable() {
+			public void run() {
+				while (!Thread.interrupted()) {
+					if (cyclicRedraw.get()) {
+						Meter.this.postInvalidate();
+					}
+					try {
+						Thread.sleep(REFRESH_INTERVALL);
+					} catch (InterruptedException e) {
+						return;
+					}
+				}
+			}
+		});
+		updater_thread.setName("Meter");
+		updater_thread.start();
+	}
+
+	@Override
+	protected void onDetachedFromWindow() {
+		updater_thread.interrupt();
+		super.onDetachedFromWindow();
+	}
+
+	@Override
+	protected void onDraw(Canvas canvas) {
+		super.onDraw(canvas);
+
+		float rotation = gaugeData.getLimitedMappedValue();
+
+		img_matrix.reset();
+		img_matrix.setRotate(rotation, needle_pos[0], needle_pos[1]);
+		img_matrix.postTranslate(needle_pos[2], needle_pos[3]);
+
+		canvas.save();
+
+		if (digitData.hasWarning()) {
+			canvas.drawRect(rect_wrn, paint_wrn);
+		}
+
+		canvas.drawBitmap(scale_bmp, 0, 0, paint);
+		canvas.drawBitmap(needle_bmp, img_matrix, paint);
+
+		String str = String.format(Locale.ENGLISH, "%3.1f",
+				digitData.getLimitedMappedValue());
+		canvas.drawText(str, text_pos[0], text_pos[1], paint);
+
+		canvas.restore();
+
+	}
 
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -138,54 +220,4 @@ public class Meter extends ImageView {
 
 		setMeasuredDimension(bw, bh);
 	}
-
-
-	@Override
-	protected void onAttachedToWindow() {
-		super.onAttachedToWindow();
-
-		updater_thread = new Thread(new Runnable() {
-			public void run() {
-				while (!Thread.interrupted()) {
-					Meter.this.postInvalidate();
-					try {
-						Thread.sleep(REFRESH_INTERVALL);
-					} catch (InterruptedException e) {
-						//e.printStackTrace();
-						return;
-					}
-				}
-			}
-		});
-		updater_thread.setName("Meter");
-		updater_thread.start();
-	}
-
-
-	@Override
-	protected void onDetachedFromWindow() {
-		updater_thread.interrupt();
-		super.onDetachedFromWindow();
-	}
-
-
-	@Override
-	public void onDraw(Canvas canvas) {
-		super.onDraw(canvas);
-
-		img_matrix.reset();
-		img_matrix.setRotate(map_angle.map_lim(), needle_pos[0], needle_pos[1]);
-		img_matrix.postTranslate(needle_pos[2], needle_pos[3]);
-
-		canvas.save();
-		if (mapping.isHigh() || mapping.isLow()) {
-			canvas.drawRect(rect_wrn, paint_wrn);
-		}
-		canvas.drawBitmap(scale_bmp, 0, 0, paint);
-		canvas.drawBitmap(needle_bmp, img_matrix, paint);
-		canvas.drawText(mapping.getString(), text_pos[0], text_pos[1], paint);
-		canvas.restore();
-
-	}
-
 }

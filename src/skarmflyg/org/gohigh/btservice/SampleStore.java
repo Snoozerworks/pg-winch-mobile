@@ -1,15 +1,21 @@
 package skarmflyg.org.gohigh.btservice;
 
+import skarmflyg.org.gohigh.arduino.Mapping;
 import skarmflyg.org.gohigh.arduino.Parameter;
-import skarmflyg.org.gohigh.arduino.ParameterSet;
 import skarmflyg.org.gohigh.arduino.Sample;
 import com.androidplot.xy.XYSeries;
 
 public class SampleStore {
+	protected ParameterSet parameters;
+
 	private Sample[] samples_arr;
-	private int head;
 	private int count;
-	private ParameterSet parameters;
+	private int head;
+
+	private Parameter param_drum;
+	private Parameter param_pump;
+	private Parameter param_temp;
+	private Parameter param_oil_lo;
 
 	// Max store size
 	private static int MAX_SIZE;
@@ -19,11 +25,21 @@ public class SampleStore {
 			throw new IllegalArgumentException();
 		}
 		MAX_SIZE = size;
-		head = -1; // Initial value
+		head = -1; // Initial value. First sample will be 0.
 		count = 0;
 		samples_arr = new Sample[MAX_SIZE];
 		parameters = new ParameterSet();
 
+		// Add default parameters for those used for plotting.
+		param_drum = new Parameter(Sample.PARAM_INDEX_DRUM);
+		param_pump = new Parameter(Sample.PARAM_INDEX_PUMP);
+		param_temp = new Parameter(Sample.PARAM_INDEX_TEMP_HI);
+		param_oil_lo = new Parameter(Sample.PARAM_INDEX_TEMP_LO);
+
+		parameters.put(param_drum);
+		parameters.put(param_pump);
+		parameters.put(param_temp);
+		parameters.put(param_oil_lo);
 	}
 
 	public Parameter getParameter(byte index) {
@@ -50,37 +66,53 @@ public class SampleStore {
 		parameters.put(p);
 	}
 
-	public void add(Sample s) {
+	public void add(Sample sample) {
 		if (count < MAX_SIZE) {
 			count++;
 		}
 		head = (head + 1) % MAX_SIZE;
-		samples_arr[head] = s;
+		samples_arr[head] = sample;
+	}
+
+	/**
+	 * Record time between current and previous sample to detect lost packages.
+	 * 
+	 * @return
+	 */
+	public long getDeltaTime() {
+		if (count < 2) {
+			return 0;
+		}
+		return getSample(0).time - getSample(1).time;
+	}
+
+	private int getPos(int i) {
+		return (MAX_SIZE + head - i) % MAX_SIZE;
 	}
 
 	public SampleXYSeries getXYSeriesDrum() {
-		return new SampleXYSeries("Drum spd") {
+		return new SampleXYSeries("Drum spd", param_drum.getMapping()) {
 			@Override
 			public Number getY(int arg0) {
-				return mapping.Map(samples_arr[getPos(arg0)].tach_drum);
+				return map(samples_arr[getPos(arg0)].tach_drum);
 			}
 		};
 	}
 
 	public SampleXYSeries getXYSeriesPump() {
-		return new SampleXYSeries("Pump spd") {
+		return new SampleXYSeries("Pump spd", param_pump.getMapping()) {
 			@Override
 			public Number getY(int arg0) {
-				return mapping.Map(samples_arr[getPos(arg0)].tach_pump);
+				return map(samples_arr[getPos(arg0)].tach_pump);
 			}
 		};
 	}
 
 	public SampleXYSeries getXYSeriesTemp() {
-		return new SampleXYSeries("Oil temp") {
+		return new SampleXYSeries("Oil temp", param_temp.getMapping()) {
 			@Override
 			public Number getY(int arg0) {
-				return mapping.Map(samples_arr[getPos(arg0)].temp);
+				return map(samples_arr[getPos(arg0)].temp);
 			}
 		};
 	}
@@ -89,7 +121,7 @@ public class SampleStore {
 		return new SampleXYSeries("Pressure") {
 			@Override
 			public Number getY(int arg0) {
-				return mapping.Map(samples_arr[getPos(arg0)].pres);
+				return map(samples_arr[getPos(arg0)].pres);
 			}
 		};
 	}
@@ -103,10 +135,6 @@ public class SampleStore {
 		};
 	}
 
-	private int getPos(int i) {
-		return (MAX_SIZE + head - i) % MAX_SIZE;
-	}
-
 	/**
 	 * Base class to extent to create XYSeries different sample data fields.
 	 * 
@@ -115,7 +143,7 @@ public class SampleStore {
 	 */
 	public abstract class SampleXYSeries implements XYSeries {
 		private String title;
-		protected Parameter mapping;
+		protected Mapping mapping = new Mapping();
 
 		/**
 		 * Create XYSeries for plotting.
@@ -127,11 +155,26 @@ public class SampleStore {
 		 */
 		public SampleXYSeries(String t) {
 			title = t;
-			mapping = new Parameter();
 		}
 
-		public void SetMapping(Parameter p) {
-			mapping = p;
+		public SampleXYSeries(String t, Mapping m) {
+			title = t;
+			setMapping(m);
+		}
+
+		/**
+		 * Mapping to use by map().
+		 * 
+		 * @param m
+		 */
+		public void setMapping(Mapping m) {
+			if (m != null) {
+				mapping = m;
+			}
+		}
+
+		protected float map(int val) {
+			return mapping.map(val);
 		}
 
 		@Override

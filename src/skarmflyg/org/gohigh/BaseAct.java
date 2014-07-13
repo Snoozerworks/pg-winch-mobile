@@ -2,7 +2,6 @@ package skarmflyg.org.gohigh;
 
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.btservice.BTService;
-import skarmflyg.org.gohigh.btservice.BtServiceCommand;
 import skarmflyg.org.gohigh.btservice.BtServiceListener;
 import skarmflyg.org.gohigh.btservice.BTService.BtBinder;
 import android.app.Activity;
@@ -11,6 +10,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 //import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -23,9 +23,6 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	// Bluetooth service
 	protected BTService btService;
 
-	// Set of winch parameters
-	// static protected ParameterSet parameters;
-
 	// Service intent
 	protected Intent serviceIntent;
 
@@ -34,7 +31,6 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	 * 
 	 * @return
 	 */
-	// abstract Handler getBtResponseHandler();
 	abstract BtServiceListener getBtListener();
 
 	/**
@@ -52,8 +48,6 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 		// Make service "started"
 		serviceIntent = new Intent(this, BTService.class);
 		startService(serviceIntent);
-
-		// parameters = new ParameterSet();
 
 		// Attach click listener to logging text view.
 		getTextView().setOnClickListener(new OnClickListener() {
@@ -78,22 +72,20 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 		bindService(serviceIntent, this, BIND_AUTO_CREATE);
 
 		logTxtSet(getTextView(), "Resuming.");
-
 	}
 
 	@Override
 	protected void onPause() {
-		// Log.i(this.getClass().getSimpleName(), "onPause");
+		Log.i(this.getClass().getSimpleName(), "onPause");
 
 		// Unbind service
 		unbindService(this);
-
 		super.onPause();
 	}
 
 	@Override
 	protected void onDestroy() {
-		// Log.i(this.getClass().getSimpleName(), "onDestroy");
+		Log.i(this.getClass().getSimpleName(), "onDestroy");
 		super.onDestroy();
 	}
 
@@ -107,13 +99,19 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	 *      android.os.IBinder)
 	 */
 	public void onServiceConnected(ComponentName className, IBinder binder) {
-		// Log.i(this.getClass().getSimpleName(), "onServiceConnected: "
-		// + className.toShortString());
+		Log.i(this.getClass().getSimpleName(), "onServiceConnected: "
+				+ className.toShortString());
 
 		BtBinder b = (BtBinder) binder;
 		btService = b.getService();
-		btService.setListener(getBtListener());
-		btService.winchSendCommand(BtServiceCommand.GET_STATE);
+		boolean is_set = btService.setListener(getBtListener());
+
+		if (is_set) {
+			// Get state if listener wasn't already attached.
+			Intent serviceIntent = new Intent(this, BTService.class)
+					.setAction(BTService.ACTION_GET_STATE);
+			startService(serviceIntent);
+		}
 
 		Toast.makeText(BaseAct.this, R.string.btservice_connected,
 				Toast.LENGTH_SHORT).show();
@@ -127,19 +125,9 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 	public void onServiceDisconnected(ComponentName className) {
 		// Log.i(this.getClass().getSimpleName(), "onServiceDisconnected"
 		// + className.toShortString());
-
 		btService = null;
-
 		Toast.makeText(BaseAct.this, R.string.btservice_disconnected,
 				Toast.LENGTH_SHORT).show();
-	}
-
-	protected void stopGetting() {
-		btService.winchSendCommand(BtServiceCommand.STOP);
-	}
-
-	protected void sendParameter(byte i, short v) {
-		btService.winchSendCommand(BtServiceCommand.SETP, i, v);
 	}
 
 	// Keep onClick listeners
@@ -155,32 +143,37 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 			@Override
 			public void onClick(View v) {
 				CompoundButton buttonView = (CompoundButton) v;
+				Intent playIntent = new Intent(v.getContext(), BTService.class);
 				if (buttonView.isChecked()) {
-					btService.winchSendCommand(BtServiceCommand.GET_SAMPLES);
+					playIntent.setAction(BTService.ACTION_START_SAMPLING);
 				} else {
-					btService.winchSendCommand(BtServiceCommand.STOP);
+					playIntent.setAction(BTService.ACTION_STOP_SAMPLING);
 				}
+				startService(playIntent);
 			}
 		};
 
 		OnClickListener clickSetBtn = new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				btService.winchSendCommand(BtServiceCommand.GET_PARAMETER);
+				startService(new Intent(v.getContext(), BTService.class)
+						.setAction(BTService.ACTION_GET_PARAMETER));
 			}
 		};
 
 		OnClickListener clickUpBtn = new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				btService.winchSendCommand(BtServiceCommand.UP);
+				startService(new Intent(v.getContext(), BTService.class)
+						.setAction(BTService.ACTION_WINCH_BTN_UP));
 			}
 		};
 
 		OnClickListener clickDownBtn = new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				btService.winchSendCommand(BtServiceCommand.DOWN);
+				startService(new Intent(v.getContext(), BTService.class)
+						.setAction(BTService.ACTION_WINCH_BTN_DOWN));
 			}
 		};
 
@@ -189,10 +182,12 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 			public void onClick(View v) {
 				CompoundButton buttonView = (CompoundButton) v;
 				if (buttonView.isChecked()) {
-					btService.winchSendCommand(BtServiceCommand.CONNECT);
+					startService(new Intent(v.getContext(), BTService.class)
+							.setAction(BTService.ACTION_CONNECT));
 					buttonView.setChecked(false);
 				} else {
-					btService.winchSendCommand(BtServiceCommand.DISCONNECT);
+					startService(new Intent(v.getContext(), BTService.class)
+							.setAction(BTService.ACTION_DISCONNECT));
 					buttonView.setChecked(true);
 				}
 
@@ -204,10 +199,11 @@ abstract public class BaseAct extends Activity implements ServiceConnection {
 			public void onClick(View v) {
 				CompoundButton buttonView = (CompoundButton) v;
 				if (buttonView.isChecked()) {
-					// parameters.clear(); // Clear current set of parameters
-					btService.winchSendCommand(BtServiceCommand.GET_PARAMETERS);
+					startService(new Intent(v.getContext(), BTService.class)
+							.setAction(BTService.ACTION_GET_PARAMETERS));
 				} else {
-					btService.winchSendCommand(BtServiceCommand.STOP);
+					startService(new Intent(v.getContext(), BTService.class)
+							.setAction(BTService.ACTION_STOP_SAMPLING));
 				}
 			}
 		};

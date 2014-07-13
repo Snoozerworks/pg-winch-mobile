@@ -40,7 +40,7 @@ public enum Mode {
 	}
 
 	// This method can be used for reverse lookup purpose
-	public static Mode get(byte mode) {
+	public static Mode toEnum(byte mode) {
 		// Mode m = lookup.get(mode);
 		Mode m = (Mode) lookup.get(mode);
 		return (m == null) ? NOMODE : m;

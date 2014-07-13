@@ -3,17 +3,20 @@ package skarmflyg.org.gohigh;
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
+import skarmflyg.org.gohigh.btservice.BTService;
 import skarmflyg.org.gohigh.btservice.BtServiceListener;
-import skarmflyg.org.gohigh.btservice.BtServiceStatus;
+import skarmflyg.org.gohigh.btservice.ServiceState;
+import android.content.ComponentName;
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.view.KeyEvent;
 import android.view.View;
-import android.view.inputmethod.EditorInfo;
+import android.view.View.OnKeyListener;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.TextView.OnEditorActionListener;
 
 public class ParameterAct extends BaseAct {
 	private static Button viewBtnSet;
@@ -44,42 +47,50 @@ public class ParameterAct extends BaseAct {
 		viewBtnSet.setOnClickListener(on.clickSetBtn);
 		viewBtnUp.setOnClickListener(on.clickUpBtn);
 		viewBtnDown.setOnClickListener(on.clickDownBtn);
-		viewEditValue.setOnEditorActionListener(onEditValueEntered);
+		viewEditValue.setOnKeyListener(onEditValueEntered);
 
 		super.onCreate(savedInstanceState);
 
 	}
 
-	private void param_set() {
-		short val;
-		float inp_val;
+	@Override
+	public void onServiceConnected(ComponentName className, IBinder binder) {
+		super.onServiceConnected(className, binder);
 
-		if (param == null) {
-			return;
+		Intent paramIntent = new Intent(this, BTService.class);
+		paramIntent.setAction(BTService.ACTION_GET_PARAMETER);
+		if (param != null) {
+			// Re-retrieve last viewed parameter if any.
+			paramIntent.putExtra("index", param.index);
 		}
-
-		try {
-			inp_val = Float.parseFloat(viewEditValue.getText().toString());
-			val = param.MapInverse(inp_val);
-		} catch (NumberFormatException e) {
-			// No number entered
-			return;
-		}
-
-		sendParameter((byte) param.index, val);
+		startService(paramIntent);
 
 	}
 
-	OnEditorActionListener onEditValueEntered = new OnEditorActionListener() {
-
+	OnKeyListener onEditValueEntered = new OnKeyListener() {
 		@Override
-		public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-			if (actionId == EditorInfo.IME_ACTION_SEND) {
-				param_set();
+		public boolean onKey(View v, int keyCode, KeyEvent event) {
+			float editor_val;
+
+			if (keyCode != 66 || param == null) {
+				return false;
 			}
+
+			try {
+				editor_val = Float.parseFloat(viewEditValue.getText()
+						.toString());
+			} catch (NumberFormatException e) {
+				// No number entered
+				return false;
+			}
+
+			Intent paramIntent = new Intent(v.getContext(), BTService.class);
+			paramIntent.setAction(BTService.ACTION_SET_PARAMETER);
+			paramIntent.putExtra("index", param.index);
+			paramIntent.putExtra("value", param.MapInverse(editor_val));
+			startService(paramIntent);
 			return false;
 		}
-
 	};
 
 	@Override
@@ -93,7 +104,6 @@ public class ParameterAct extends BaseAct {
 	}
 
 	private class ServiceListener implements BtServiceListener {
-
 		@Override
 		public void onText(CharSequence s) {
 			logTxt(txt, s.toString());
@@ -105,12 +115,13 @@ public class ParameterAct extends BaseAct {
 
 		@Override
 		public void onParameterReceived(Parameter p) {
+			param = p;
 			viewEditValue.setText(String.format("%.1f", p.val_map));
 			logTxtSet(txt, p.toStringMapped());
 		}
 
 		@Override
-		public void onStatusChange(BtServiceStatus status) {
+		public void onStateChange(ServiceState status) {
 			switch (status) {
 			case STATE_CONNECTED:
 				logTxt(txt, "Bluetooth uppkopplad.");
@@ -150,6 +161,17 @@ public class ParameterAct extends BaseAct {
 		@Override
 		public void onConnectionTimeout() {
 			logTxt(txt, "Connection timeout");
+		}
+
+		@Override
+		public void onRecordStateChange(boolean is_recording) {
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public String getId() {
+			return "ParameterActServiceListener";
 		}
 
 	}

@@ -1,10 +1,8 @@
 package skarmflyg.org.gohigh.btservice;
 
 import skarmflyg.org.gohigh.ConnectAct;
-//import skarmflyg.org.gohigh.R.string;
 import skarmflyg.org.gohigh.R;
 import skarmflyg.org.gohigh.arduino.Parameter;
-import skarmflyg.org.gohigh.arduino.ParameterSet;
 import skarmflyg.org.gohigh.arduino.Sample;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -19,46 +17,70 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.support.v4.app.NotificationCompat;
-import android.support.v4.app.NotificationCompat.Builder;
-//import android.util.Log;
+import android.util.Log;
 import android.widget.Toast;
 
 public class BTService extends Service {
+	// Number of samples to show in graph
+	public static final int GRAPH_SAMPEL_COUNT = 100;
+	// Max number of samples to store in file
+	private final int FILE_SAMPEL_COUNT = 5000;
+
+	public static final String ACTION_CONNECT = "skarmflyg.org.gohigh.action.CONNECT";
+	public static final String ACTION_DISCONNECT = "skarmflyg.org.gohigh.action.DISCONNECT";
+	public static final String ACTION_GET_PARAMETER = "skarmflyg.org.gohigh.action.GET_PARAM";
+	public static final String ACTION_GET_PARAMETERS = "skarmflyg.org.gohigh.action.GET_PARAMS";
+	public static final String ACTION_SET_PARAMETER = "skarmflyg.org.gohigh.action.SET_PARAM";
+	public static final String ACTION_GET_STATE = "skarmflyg.org.gohigh.action.GET_STATE";
+	public static final String ACTION_KILL_SERVICE = "skarmflyg.org.gohigh.action.KILL";
+	public static final String ACTION_STOP_RECORDING = "skarmflyg.org.gohigh.action.REC_OFF";
+	public static final String ACTION_START_RECORDING = "skarmflyg.org.gohigh.action.REC_ON";
+	public static final String ACTION_STOP_SAMPLING = "skarmflyg.org.gohigh.action.PLAY_OFF";
+	public static final String ACTION_START_SAMPLING = "skarmflyg.org.gohigh.action.PLAY_ON";
+	public static final String ACTION_WINCH_BTN_DOWN = "skarmflyg.org.gohigh.action.WINCH_DOWN";
+	public static final String ACTION_WINCH_BTN_UP = "skarmflyg.org.gohigh.action.WINCH_UP";
+
+	// Binder object which is used by clients to send commands to service.
 	private final BtBinder btBinder = new BtBinder();
 
 	// Bluetooth thread name
-	static final private String BT_THREAD_NAME = "WinchThread";
+	private static final String BT_THREAD_NAME = "WinchThread";
 
 	// Bluetooth thread.
 	private static BtThread btThread;
 
+	// Handler for messages sent from thread
+	private static final BtHandlerOnMain btHandlerOnMain = new BtHandlerOnMain();
+
 	// Receive bluetooth events.
 	private static BroadcastReceiver btBroadcastReceiver;
-
 	private static BtServiceListener btServiceResponseListener;
 
+	// Store data
 	private static SampleStoreFile sampleStore;
 
 	// Notifier
-	private NotificationManager mNM;
+	private static NotificationManager mNM;
+
+	// Store context
+	private static Context appContext;
+
+	// Keep service state
+	private static ServiceState serviceState = ServiceState.STATE_DISCONNECTED;
 
 	// Unique Identification Number for the Notification. We use it on
 	// Notification start, and to cancel it.
-	private int NOTIFICATION = R.string.btservice_started;
-
-	public static final int GRAPH_SAMPEL_COUNT = 50;
-	private final int FILE_SAMPEL_COUNT = 1500;
+	private static final int NOTIFICATION = R.string.btservice_started;
 
 	@Override
 	public void onCreate() {
-		// Log.i(this.getClass().getSimpleName(), "onCreate");
+		Log.i(this.getClass().getSimpleName(), "onCreate");
 
-		// Log.d(BTService.class.getSimpleName(), "BTService construct");
+		appContext = getApplicationContext();
 
 		// Handle message from bluetooth thread.
 		Context c = getApplicationContext();
-		BtHandlerOnMain h = new BtHandlerOnMain();
-		btThread = new BtThread(c, BT_THREAD_NAME, h);
+		btThread = new BtThread(c, BT_THREAD_NAME, btHandlerOnMain);
 		btThread.start();
 
 		/**
@@ -71,30 +93,23 @@ public class BTService extends Service {
 			public void onReceive(Context context, Intent intent) {
 				String action = intent.getAction();
 
-				NotificationCompat.Builder builder;
-				builder = getNotification();
-
 				if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
-					builder.setContentText(getText(R.string.bt_connected));
-					mNM.notify(NOTIFICATION, builder.build());
-
+					serviceState = ServiceState.STATE_CONNECTED;
 					if (btServiceResponseListener != null) {
 						btServiceResponseListener
-								.onStatusChange(BtServiceStatus.STATE_CONNECTED);
+								.onStateChange(ServiceState.STATE_CONNECTED);
 					}
+					createNotification();
 
 				} else if (BluetoothDevice.ACTION_ACL_DISCONNECTED
 						.equals(action)) {
-					builder.setContentText(getText(R.string.bt_disconnected));
-					mNM.notify(NOTIFICATION, builder.build());
-
-					sampleStore.stopWrite();
-
+					serviceState = ServiceState.STATE_DISCONNECTED;
 					if (btServiceResponseListener != null) {
 						btServiceResponseListener
-								.onStatusChange(BtServiceStatus.STATE_DISCONNECTED);
+								.onStateChange(ServiceState.STATE_DISCONNECTED);
 					}
-
+					stopRecord();
+					createNotification();
 				}
 
 			}
@@ -109,17 +124,95 @@ public class BTService extends Service {
 		registerReceiver(btBroadcastReceiver, btIntentFilter);
 
 		// Display a notification to announce started service.
-		Builder notification = getNotification();
-		notification.setContentText(getText(R.string.btservice_started));
 		mNM = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-		mNM.notify(NOTIFICATION, notification.build());
-
+		createNotification();
 	}
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		// Log.i(this.getClass().getSimpleName(),
-		// "onStartCommand. Received start id " + startId + ": " + intent);
+		Log.i(this.getClass().getSimpleName(), "onStartCommand");
+
+		// Different requests as sent from the action bar.
+		String action = intent.getAction();
+
+		if (action != null) {
+			int param_index = intent.getIntExtra("index", 0);
+			int param_value = intent.getIntExtra("value", Integer.MIN_VALUE);
+
+			switch (action) {
+			case ACTION_CONNECT:
+				btThread.sendCommand(BtServiceCommand.CONNECT, null);
+				break;
+
+			case ACTION_DISCONNECT:
+				btThread.sendCommand(BtServiceCommand.DISCONNECT, null);
+				break;
+
+			case ACTION_GET_PARAMETER:
+				if (intent.hasExtra("index")) {
+					// Get parameter by index
+					btThread.sendCommand(BtServiceCommand.SETP,
+							new byte[] { (byte) param_index });
+				} else {
+					// Get next parameter
+					btThread.sendCommand(BtServiceCommand.SETP, null);
+				}
+				break;
+
+			case ACTION_GET_PARAMETERS:
+				btThread.sendCommand(BtServiceCommand.GET_PARAMETERS, null);
+				break;
+
+			case ACTION_GET_STATE:
+				btThread.sendCommand(BtServiceCommand.GET_STATE, null);
+				break;
+
+			case ACTION_KILL_SERVICE:
+				// Cancel the persistent notification and kill service.
+				// onDestroy will be called as a consequence of calling
+				// stopSelf().
+				mNM.cancel(NOTIFICATION);
+				stopSelf();
+				break;
+
+			case ACTION_STOP_RECORDING:
+				stopRecord();
+				break;
+
+			case ACTION_START_RECORDING:
+				startRecord();
+				break;
+
+			case ACTION_SET_PARAMETER:
+				if (intent.hasExtra("index") && intent.hasExtra("value")) {
+					btThread.sendCommand(BtServiceCommand.SETP, new byte[] {
+							(byte) param_index, //
+							(byte) ((param_value & 0xFF) >> 8), //
+							(byte) (param_value & 0xFF) });
+				}
+				break;
+
+			case ACTION_START_SAMPLING:
+				btThread.sendCommand(BtServiceCommand.GET_SAMPLES, null);
+				break;
+
+			case ACTION_STOP_SAMPLING:
+				btThread.sendCommand(BtServiceCommand.STOP, null);
+				break;
+
+			case ACTION_WINCH_BTN_DOWN:
+				btThread.sendCommand(BtServiceCommand.DOWN, null);
+				break;
+
+			case ACTION_WINCH_BTN_UP:
+				btThread.sendCommand(BtServiceCommand.UP, null);
+				break;
+
+			default:
+				Log.d(this.getClass().getSimpleName(),
+						"Service started with empty action");
+			}
+		}
 
 		// We want this service to continue running until it is explicitly
 		// stopped, so return sticky.
@@ -134,17 +227,18 @@ public class BTService extends Service {
 
 	@Override
 	public void onDestroy() {
-		// Log.i(this.getClass().getSimpleName(), "onDestroy");
+		Log.i(this.getClass().getSimpleName(), "onDestroy");
 
 		// Disconnect bluetooth
-		winchSendCommand(BtServiceCommand.DISCONNECT);
-
-		// Cancel the persistent notification.
-		mNM.cancel(NOTIFICATION);
-
-		unregisterReceiver(btBroadcastReceiver);
 		btThread.getLooper().quit();
+
+		// Unregister broadcast receiver
+		unregisterReceiver(btBroadcastReceiver);
+
+		// Clear some stuff (shouldn't be necessary)
 		btThread = null;
+		btBroadcastReceiver = null;
+		btServiceResponseListener = null;
 
 		// Tell the user we stopped.
 		Toast.makeText(this, R.string.btservice_stopped, Toast.LENGTH_SHORT)
@@ -152,45 +246,67 @@ public class BTService extends Service {
 	}
 
 	/**
-	 * Show a notification while this service is running.
+	 * Build and show notification based on service status and recording status.
 	 */
-	private NotificationCompat.Builder getNotification() {
-		// Set icon, scrolling text and time stamp
+	private static void createNotification() {
+
+		// Build the notification
 		NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(
-				this).setSmallIcon(R.drawable.ic_stat_notify) //
-				.setContentTitle(getText(R.string.app_name)) //
-				.setWhen(System.currentTimeMillis());
+				appContext);
+		mBuilder.setOngoing(true);
+		mBuilder.setSmallIcon(R.drawable.ic_stat_notify); //
+		mBuilder.setContentTitle(appContext.getText(R.string.app_name)); //
+		mBuilder.setWhen(System.currentTimeMillis());
 
-		// The PendingIntent to launch our activity if the user selects this
-		// notification
-		PendingIntent contentIntent = PendingIntent.getActivity(this, 0,
-				new Intent(this, ConnectAct.class), 0);
-
-		// Set the info for the views that show in the notification panel.
+		// PendingIntent:s to launch if the user selects this notification
+		PendingIntent contentIntent = PendingIntent.getActivity(appContext, 0,
+				new Intent(appContext, ConnectAct.class), 0);
 		mBuilder.setContentIntent(contentIntent);
 
-		return mBuilder;
-	}
+		switch (serviceState) {
+		case STATE_CONNECTED:
+			mBuilder.setContentText(appContext
+					.getText(R.string.state_connected));
+			break;
 
-	/**
-	 * Send a command to the winch to expect a Sample or Parameter back.
-	 * 
-	 * @param cmd
-	 */
-	public void winchSendCommand(BtServiceCommand cmd) {
-		btThread.sendCommand(cmd);
-	}
+		case STATE_DISCONNECTED:
+			mBuilder.setContentText(appContext
+					.getText(R.string.state_disconnected));
+			break;
+		case STATE_SAMPELS:
+			mBuilder.setContentText(appContext.getText(R.string.state_sampels));
+			break;
 
-	/**
-	 * Send command to set winsch parameter.
-	 * 
-	 * @param i
-	 *            Parameter index.
-	 * @param v
-	 *            Parameter value to set.
-	 */
-	public void winchSendCommand(BtServiceCommand cmd, byte i, short v) {
-		btThread.sendCommand(cmd, i, v);
+		case STATE_STOPPED:
+			mBuilder.setContentText(appContext.getText(R.string.state_stopped));
+			break;
+
+		case STATE_SYNCS:
+			mBuilder.setContentText(appContext.getText(R.string.state_syncs));
+			break;
+
+		default:
+			break;
+
+		}
+
+		// Add extra actions
+		if (sampleStore.isWriting()) {
+			PendingIntent recordOffIntent = PendingIntent.getService(
+					appContext, 0, new Intent(ACTION_STOP_RECORDING, null,
+							appContext, BTService.class), 0);
+			mBuilder.addAction(R.drawable.ic_menu_stop, "Stoppa log",
+					recordOffIntent);
+
+		} else {
+			PendingIntent recordOnIntent = PendingIntent.getService(appContext,
+					0, new Intent(ACTION_START_RECORDING, null, appContext,
+							BTService.class), 0);
+			mBuilder.addAction(R.drawable.ic_menu_record, "Starta log",
+					recordOnIntent);
+		}
+
+		mNM.notify(NOTIFICATION, mBuilder.build());
 	}
 
 	/**
@@ -203,22 +319,24 @@ public class BTService extends Service {
 	}
 
 	/**
-	 * Get the parameter set.
-	 * 
-	 * @return Set of parameters.
+	 * Start saving samples to file.
 	 */
-	public ParameterSet getParameterSet() {
-		return sampleStore.getParameters();
+	private static void startRecord() {
+		sampleStore.startWrite();
+		btHandlerOnMain
+				.dispatchMessage(btHandlerOnMain.obtainMessage(
+						ServiceLoggerState.ENUM_TYPE,
+						ServiceLoggerState.LOGGER_ACTIVE));
 	}
 
 	/**
-	 * Get parameter by index.
-	 * 
-	 * @param index
-	 * @return Parameter or null if index do not exist.
+	 * Stop saving samples to file.
 	 */
-	public Parameter getParameter(byte index) {
-		return sampleStore.getParameter(index);
+	private static void stopRecord() {
+		sampleStore.stopWrite();
+		btHandlerOnMain.dispatchMessage(btHandlerOnMain.obtainMessage(
+				ServiceLoggerState.ENUM_TYPE,
+				ServiceLoggerState.LOGGER_INACTIVE));
 	}
 
 	private static class BtHandlerOnMain extends Handler {
@@ -226,12 +344,16 @@ public class BTService extends Service {
 		public void handleMessage(Message msg) {
 
 			switch (msg.what) {
-			case BtServiceStatus.ENUM_TYPE:
-				handleStatus(msg);
+			case ServiceState.ENUM_TYPE:
+				handleState(msg);
 				break;
 
-			case BtServiceResult.ENUM_TYPE:
+			case ServiceResult.ENUM_TYPE:
 				handleResult(msg);
+				break;
+
+			case ServiceLoggerState.ENUM_TYPE:
+				handleLoggerState(msg);
 				break;
 
 			default:
@@ -240,23 +362,51 @@ public class BTService extends Service {
 
 		}
 
-		private void handleStatus(Message msg) {
+		private void handleLoggerState(Message msg) {
+			ServiceLoggerState logState = ServiceLoggerState.toEnum(msg.arg1);
 
-			BtServiceStatus s = BtServiceStatus.toEnum(msg.arg1);
+			createNotification();
 
-			switch (s) {
+			// Notify listener if available
+			if (btServiceResponseListener == null) {
+				return;
+			}
+			switch (logState) {
+			case LOGGER_ACTIVE:
+				btServiceResponseListener.onRecordStateChange(true);
+				break;
+
+			case LOGGER_INACTIVE:
+				btServiceResponseListener.onRecordStateChange(false);
+				break;
+
+			default:
+			}
+
+		}
+
+		private void handleState(Message msg) {
+
+			if (ServiceState.toEnum(msg.arg1) == null) {
+				throw new IllegalStateException("Unknown state reported!");
+			}
+
+			serviceState = ServiceState.toEnum(msg.arg1);
+			createNotification();
+
+			switch (serviceState) {
 			case STATE_CONNECTED:
 				break;
 
 			case STATE_DISCONNECTED:
-				sampleStore.stopWrite();
+				stopRecord();
 				break;
 
 			case STATE_SAMPELS:
 				break;
 
 			case STATE_STOPPED:
-				sampleStore.stopWrite();
+				stopRecord();
 				break;
 
 			case STATE_SYNCS:
@@ -266,7 +416,9 @@ public class BTService extends Service {
 				break;
 			}
 
-			btServiceResponseListener.onStatusChange(s);
+			if (btServiceResponseListener != null) {
+				btServiceResponseListener.onStateChange(serviceState);
+			}
 
 		}
 
@@ -274,46 +426,47 @@ public class BTService extends Service {
 
 			Parameter param = null;
 			Sample sam = null;
-			CharSequence txt = null;
-			BtServiceResult r = BtServiceResult.toEnum(msg.arg1);
+			ServiceResult result = ServiceResult.toEnum(msg.arg1);
 
-			switch (r) {
-			case ANS_TXT:
-				txt = (CharSequence) msg.obj;
-				if (btServiceResponseListener != null) {
-					btServiceResponseListener.onText(txt);
-				}
-				break;
-
-			case CONNECTION_TIMEOUT:
-				if (btServiceResponseListener != null) {
-					btServiceResponseListener.onConnectionTimeout();
-				}
-				break;
-
-			case PACKAGE_TIMEOUT:
-				if (btServiceResponseListener != null) {
-					btServiceResponseListener.onPackageTimeout();
-				}
-				break;
-
+			// Add parameters and samples to store.
+			switch (result) {
 			case PARAMETER_RECEIVED:
 				param = new Parameter((byte[]) msg.obj);
 				sampleStore.add(param);
-				if (btServiceResponseListener != null) {
-					btServiceResponseListener.onParameterReceived(param);
-				}
 				break;
 
 			case SAMPLE_RECEIVED:
 				sam = new Sample((byte[]) msg.obj);
-				if (!sampleStore.isWriting()) {
-					sampleStore.startWrite();
-				}
 				sampleStore.add(sam);
-				if (btServiceResponseListener != null) {
-					btServiceResponseListener.onSampleReceived(sam);
-				}
+				break;
+
+			default:
+			}
+
+			// Notify listener if available
+			if (btServiceResponseListener == null) {
+				return;
+			}
+
+			switch (result) {
+			case ANS_TXT:
+				btServiceResponseListener.onText((CharSequence) msg.obj);
+				break;
+
+			case CONNECTION_TIMEOUT:
+				btServiceResponseListener.onConnectionTimeout();
+				break;
+
+			case PACKAGE_TIMEOUT:
+				btServiceResponseListener.onPackageTimeout();
+				break;
+
+			case PARAMETER_RECEIVED:
+				btServiceResponseListener.onParameterReceived(param);
+				break;
+
+			case SAMPLE_RECEIVED:
+				btServiceResponseListener.onSampleReceived(sam);
 				break;
 
 			default:
@@ -324,12 +477,25 @@ public class BTService extends Service {
 		}
 	}
 
-	public void setListener(BtServiceListener listener) {
-		if (btServiceResponseListener != null) {
-			// Log.d(this.getClass().getSimpleName(),
-			// "Replacing listener in service");
+	/**
+	 * Set service listener. Returns true if a new listener is set.
+	 * 
+	 * @param listener
+	 * @return
+	 */
+	public boolean setListener(BtServiceListener listener) {
+		if (listener == null) {
+			return false;
+		}
+		if (btServiceResponseListener == null) {
+			btServiceResponseListener = listener;
+			return true;
+		}
+		if (btServiceResponseListener.getId() == listener.getId()) {
+			return false;
 		}
 		btServiceResponseListener = listener;
+		return true;
 	}
 
 	public class BtBinder extends Binder {

@@ -4,10 +4,7 @@ import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
 
 public interface BtServiceListener {
-
-	public void onStatusChange(BtServiceStatus status);
-
-	// public void onBtResult(BtServiceResult response);
+	public void onStateChange(ServiceState status);
 
 	public void onPackageTimeout();
 
@@ -19,4 +16,12 @@ public interface BtServiceListener {
 
 	public void onText(CharSequence s);
 
+	public void onRecordStateChange(boolean is_recording);
+
+	/**
+	 * Return a unique string for the instance.
+	 * 
+	 * @return A unique string
+	 */
+	public String getId();
 }

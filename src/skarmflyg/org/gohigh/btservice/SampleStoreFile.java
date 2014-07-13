@@ -3,6 +3,7 @@ package skarmflyg.org.gohigh.btservice;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
 import android.os.Environment;
 import android.text.format.Time;
@@ -23,19 +24,32 @@ public class SampleStoreFile extends SampleStore {
 
 	public void startWrite() {
 		write_en = false;
-		if (isExternalStorageWritable()) {
-			File f = getFileStorageDir(createFileName());
-			try {
-				fw = new FileWriter(f);
-				write_en = true;
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		if (!isExternalStorageWritable()) {
+			return;
+		}
 
+		File f = getFileStorageDir(createFileName());
+		try {
+			// Create file
+			fw = new FileWriter(f);
+
+			// Add headers and parameters
+			fw.append(Parameter.csvHeaders());
+			fw.append(parameters.toCSV());
+			fw.append("\n");
+			fw.append(Sample.csvHeaders());
+
+			// Flag enabled
+			write_en = true;
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 
 	}
 
+	/**
+	 * Stop writing and close file.
+	 */
 	public void stopWrite() {
 		write_en = false;
 		count = 0;
@@ -49,6 +63,11 @@ public class SampleStoreFile extends SampleStore {
 		}
 	}
 
+	/**
+	 * Check if samples will be saved to file.
+	 * 
+	 * @return True if saving to file.
+	 */
 	public boolean isWriting() {
 		return write_en;
 	}
@@ -64,9 +83,6 @@ public class SampleStoreFile extends SampleStore {
 
 		if (write_en) {
 			try {
-				if (count == 0) {
-					fw.append(Sample.csvHeaders());
-				}
 				fw.append(s.toCsv());
 				count++;
 			} catch (IOException e) {
@@ -80,7 +96,7 @@ public class SampleStoreFile extends SampleStore {
 	/**
 	 * Checks if external storage is available for read and write
 	 */
-	public boolean isExternalStorageWritable() {
+	private boolean isExternalStorageWritable() {
 		String state = Environment.getExternalStorageState();
 		if (Environment.MEDIA_MOUNTED.equals(state)) {
 			return true;
@@ -88,7 +104,7 @@ public class SampleStoreFile extends SampleStore {
 		return false;
 	}
 
-	public File getFileStorageDir(String albumName) {
+	private File getFileStorageDir(String albumName) {
 		// Get the directory for the user's public pictures directory.
 		File folder = new File(Environment.getExternalStorageDirectory()
 				+ "/Winsch");

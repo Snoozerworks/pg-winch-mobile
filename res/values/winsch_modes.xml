@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+
+    <string-array name="modes">
+        <item>Av</item>
+        <item>Uppstart</item>
+        <item>Installation</item>
+        <item>Inställningar</item>
+        <item>Vänteläge</item>
+        <item>Dragläge</item>
+    </string-array>
+
+</resources>
