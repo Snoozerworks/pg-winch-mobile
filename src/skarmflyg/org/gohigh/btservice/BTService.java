@@ -139,16 +139,12 @@ public class BTService extends Service {
 			int param_index = intent.getIntExtra("index", 0);
 			int param_value = intent.getIntExtra("value", Integer.MIN_VALUE);
 
-			switch (action) {
-			case ACTION_CONNECT:
+			if (action == ACTION_CONNECT) {
 				btThread.sendCommand(BtServiceCommand.CONNECT, null);
-				break;
 
-			case ACTION_DISCONNECT:
-				btThread.sendCommand(BtServiceCommand.DISCONNECT, null);
-				break;
+			} else if (action == ACTION_DISCONNECT) {
 
-			case ACTION_GET_PARAMETER:
+			} else if (action == ACTION_GET_PARAMETER) {
 				if (intent.hasExtra("index")) {
 					// Get parameter by index
 					btThread.sendCommand(BtServiceCommand.SETP,
@@ -157,58 +153,47 @@ public class BTService extends Service {
 					// Get next parameter
 					btThread.sendCommand(BtServiceCommand.SETP, null);
 				}
-				break;
 
-			case ACTION_GET_PARAMETERS:
+			} else if (action == ACTION_GET_PARAMETERS) {
 				btThread.sendCommand(BtServiceCommand.GET_PARAMETERS, null);
-				break;
 
-			case ACTION_GET_STATE:
+			} else if (action == ACTION_GET_STATE) {
 				btThread.sendCommand(BtServiceCommand.GET_STATE, null);
-				break;
 
-			case ACTION_KILL_SERVICE:
+			} else if (action == ACTION_KILL_SERVICE) {
 				// Cancel the persistent notification and kill service.
 				// onDestroy will be called as a consequence of calling
 				// stopSelf().
 				mNM.cancel(NOTIFICATION);
 				stopSelf();
-				break;
 
-			case ACTION_STOP_RECORDING:
+			} else if (action == ACTION_STOP_RECORDING) {
 				stopRecord();
-				break;
 
-			case ACTION_START_RECORDING:
+			} else if (action == ACTION_START_RECORDING) {
 				startRecord();
-				break;
 
-			case ACTION_SET_PARAMETER:
+			} else if (action == ACTION_SET_PARAMETER) {
 				if (intent.hasExtra("index") && intent.hasExtra("value")) {
 					btThread.sendCommand(BtServiceCommand.SETP, new byte[] {
 							(byte) param_index, //
 							(byte) ((param_value & 0xFF) >> 8), //
 							(byte) (param_value & 0xFF) });
 				}
-				break;
 
-			case ACTION_START_SAMPLING:
+			} else if (action == ACTION_START_SAMPLING) {
 				btThread.sendCommand(BtServiceCommand.GET_SAMPLES, null);
-				break;
 
-			case ACTION_STOP_SAMPLING:
+			} else if (action == ACTION_STOP_SAMPLING) {
 				btThread.sendCommand(BtServiceCommand.STOP, null);
-				break;
 
-			case ACTION_WINCH_BTN_DOWN:
+			} else if (action == ACTION_WINCH_BTN_DOWN) {
 				btThread.sendCommand(BtServiceCommand.DOWN, null);
-				break;
 
-			case ACTION_WINCH_BTN_UP:
+			} else if (action == ACTION_WINCH_BTN_UP) {
 				btThread.sendCommand(BtServiceCommand.UP, null);
-				break;
 
-			default:
+			} else {
 				Log.d(this.getClass().getSimpleName(),
 						"Service started with empty action");
 			}

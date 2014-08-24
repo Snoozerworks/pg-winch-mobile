@@ -4,7 +4,7 @@ import skarmflyg.org.gohigh.arduino.Parameter;
 import android.util.SparseArray;
 
 public class ParameterSet {
-	private SparseArray<Parameter> param_arr = new SparseArray<>(0);
+	private SparseArray<Parameter> param_arr = new SparseArray<Parameter>(0);
 
 	/**
 	 * Add parameter to set. Update if parameter already exist.
