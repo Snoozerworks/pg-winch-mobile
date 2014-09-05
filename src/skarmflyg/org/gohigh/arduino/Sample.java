@@ -85,7 +85,7 @@ public class Sample extends DataPackage {
 
 	public String toCsv() {
 		String format = "%d,%d,%d,%d,%d,%d\n";
-		return String.format(format, mode.getByte(), time, tach_pump,
+		return String.format(format, time, mode.getByte(), tach_pump,
 				tach_drum, temp, pres);
 	}
 
