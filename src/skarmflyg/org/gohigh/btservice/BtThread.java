@@ -79,6 +79,15 @@ public class BtThread extends HandlerThread {
 		return true;
 	}
 
+	public void setMac(String mac_address) {
+		if (workerHandler == null) {
+			Log.w(this.getClass().getSimpleName(),
+					"Attempt to use null handler");
+		}
+		workerHandler.obtainMessage(BtServiceCommand.SET_MAC.toInt(), mac_address)
+				.sendToTarget();
+	}
+
 	/**
 	 * 
 	 * @author markus
@@ -86,7 +95,7 @@ public class BtThread extends HandlerThread {
 	 */
 	static class WorkerHandler extends Handler {
 		// Change MAC-address here! ***
-		final private String BT_MAC = "00:06:66:43:07:C0";
+		private String BT_MAC = "00:06:66:43:07:C0";
 		// Bluetooth timeout in milliseconds.
 		final private int BT_PACKAGE_TIMEOUT = 1000;
 		// Bluetooth period of reads in milliseconds.
@@ -167,6 +176,10 @@ public class BtThread extends HandlerThread {
 
 			case CONNECT:
 				onConnect();
+				return;
+
+			case SET_MAC:
+				BT_MAC = (String) msg.obj;
 				return;
 
 			case _READ:
@@ -365,6 +378,7 @@ public class BtThread extends HandlerThread {
 			// Try get remote bluetooth device
 			btDevice = btAdapter.getRemoteDevice(BT_MAC);
 
+			Log.i(this.getClass().getSimpleName(), "Connecting to mac " + BT_MAC);
 			// Create bluetooth rfcomm socket (serial communication)
 			try {
 				btSocket = btDevice

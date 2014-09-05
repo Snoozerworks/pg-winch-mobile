@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
 
     <string name="app_name">GoHigh</string>
@@ -23,13 +24,16 @@
     <string name="meter_scale">Meter scale</string>
     <string name="bt_not_supported">Bluetooth not supported</string>
     <string name="bt_disabled">Bluetooth disabled</string>
-<!--     <string name="bt_connected">Blåtand ansluten.</string> -->
-<!--     <string name="bt_disconnected">Blåtand frånkopplad.</string> -->
+    <!-- <string name="bt_connected">Blåtand ansluten.</string> -->
+    <!-- <string name="bt_disconnected">Blåtand frånkopplad.</string> -->
     <string name="parameter_act">Inställningar för vinsch</string>
     <string name="img_oil_temp">Olje temperatur</string>
     <string name="img_drum_speed">Trumhastighet</string>
     <string name="img_pump_speed">Pumphastighet</string>
     <string name="msg_connect_to_winch">Anslut till vinschen</string>
     <string name="txt_param_lbl">Värde</string>
+    <string name="title_activity_list_paiered_bt_devices">Paired bluetooth devices</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
 
 </resources>

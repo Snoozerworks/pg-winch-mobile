@@ -116,6 +116,13 @@
         </TableRow>
     </TableLayout>
 
+    <TextView
+        android:id="@+id/txt_btmac"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Select bluetooth device"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
     <ScrollView
         android:id="@+id/sv_log"
         android:layout_width="fill_parent"

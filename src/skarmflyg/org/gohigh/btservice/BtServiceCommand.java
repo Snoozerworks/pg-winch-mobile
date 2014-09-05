@@ -7,7 +7,7 @@ package skarmflyg.org.gohigh.btservice;
  * 
  */
 public enum BtServiceCommand {
-	CONNECT, DISCONNECT, STOP, //
+	CONNECT, DISCONNECT, STOP, SET_MAC, //
 	UP, DOWN, SELECT, SETP, //
 	GET_SAMPLE, GET_SAMPLES, GET_PARAMETERS, GET_STATE, _READ;
 

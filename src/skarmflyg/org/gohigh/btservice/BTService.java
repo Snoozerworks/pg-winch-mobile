@@ -143,6 +143,7 @@ public class BTService extends Service {
 				btThread.sendCommand(BtServiceCommand.CONNECT, null);
 
 			} else if (action == ACTION_DISCONNECT) {
+				btThread.sendCommand(BtServiceCommand.DISCONNECT, null);
 
 			} else if (action == ACTION_GET_PARAMETER) {
 				if (intent.hasExtra("index")) {
@@ -322,6 +323,10 @@ public class BTService extends Service {
 		btHandlerOnMain.dispatchMessage(btHandlerOnMain.obtainMessage(
 				ServiceLoggerState.ENUM_TYPE,
 				ServiceLoggerState.LOGGER_INACTIVE));
+	}
+	
+	public void setBtMac(String mac_address) {
+		btThread.setMac(mac_address);
 	}
 
 	private static class BtHandlerOnMain extends Handler {

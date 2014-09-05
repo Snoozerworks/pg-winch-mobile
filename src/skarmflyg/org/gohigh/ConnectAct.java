@@ -1,5 +1,7 @@
 package skarmflyg.org.gohigh;
 
+import java.util.Set;
+
 import skarmflyg.org.gohigh.R.id;
 import skarmflyg.org.gohigh.arduino.Parameter;
 import skarmflyg.org.gohigh.arduino.Sample;
@@ -8,11 +10,17 @@ import skarmflyg.org.gohigh.btservice.BtServiceListener;
 import skarmflyg.org.gohigh.btservice.ServiceState;
 import skarmflyg.org.gohigh.widgets.Digits;
 import skarmflyg.org.gohigh.widgets.Meter;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListPopupWindow;
 import android.widget.TextView;
 import android.widget.ToggleButton;
 
@@ -29,6 +37,8 @@ public class ConnectAct extends BaseAct {
 	private ToggleButton viewBtnSync;
 
 	private TextView txt;
+	private TextView txt_btmac;
+	private ListPopupWindow btMacPopup;
 
 	private BtServiceListener listener;
 
@@ -38,6 +48,7 @@ public class ConnectAct extends BaseAct {
 
 		// Get views
 		txt = (TextView) findViewById(id.txt_log);
+		txt_btmac = (TextView) findViewById(id.txt_btmac);
 		viewForceMeter = (Meter) findViewById(id.force_meter);
 		viewTempDigits = (Digits) findViewById(id.temperature);
 		viewDrumDigits = (Digits) findViewById(id.drum_spd);
@@ -47,7 +58,28 @@ public class ConnectAct extends BaseAct {
 		viewBtnSync = (ToggleButton) findViewById(id.btn_op_load);
 		viewBtnSettingAct = (Button) findViewById(id.btn_settings_act);
 
+		// Arrange popup for selecting bt mac address
+		btMacPopup = new ListPopupWindow(this);
+		btMacPopup.setAnchorView(txt_btmac);
+		btMacPopup.setModal(true);
+		btMacPopup.setAdapter(getPairedBtList());
+		btMacPopup.setOnItemClickListener(new OnItemClickListener() {
+			@Override
+			public void onItemClick(AdapterView<?> parent, View view,
+					int position, long id) {
+
+				BluetoothDevice dev = (BluetoothDevice) parent.getAdapter()
+						.getItem(position);
+				String adr = dev.getAddress();
+				String name = dev.getName();
+				txt_btmac.setText("Enhet: " + name + " - " + adr);
+				btService.setBtMac(adr);
+				btMacPopup.dismiss();
+			}
+		});
+
 		// Connect click listeners
+		txt_btmac.setOnClickListener(onBtMacClicked);
 		viewBtnConnect.setOnClickListener(on.clickConnectBtn);
 		viewBtnSample.setOnClickListener(on.clickSampleBtn); // setOnClickListener(onClickSampleBtn);
 		viewBtnSync.setOnClickListener(on.clickSyncBtn);
@@ -69,6 +101,35 @@ public class ConnectAct extends BaseAct {
 		super.onCreate(savedInstanceState);
 
 	}
+
+	private ArrayAdapter<BluetoothDevice> getPairedBtList() {
+		BluetoothAdapter btAdapter = BluetoothAdapter.getDefaultAdapter();
+		Set<BluetoothDevice> devices = btAdapter.getBondedDevices();
+
+		ArrayAdapter<BluetoothDevice> btNames = new ArrayAdapter<BluetoothDevice>(
+				ConnectAct.this, R.layout.paired_bt_popup);
+		btNames.addAll(devices);
+
+		return btNames;
+	}
+
+	OnClickListener onBtMacClicked = new View.OnClickListener() {
+		@Override
+		public void onClick(View v) {
+
+			btMacPopup.show();
+
+		}
+	};
+
+	//
+	// @Override
+	// public void onItemClick(AdapterView<?> parent, View view,
+	// int position, long id) {
+	// // productName.setText(products[position]);
+	// listPopupWindow.dismiss();
+	// }
+	//
 
 	@Override
 	public void onBackPressed() {
