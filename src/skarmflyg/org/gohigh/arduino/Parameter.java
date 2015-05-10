@@ -82,6 +82,10 @@ public class Parameter extends DataPackage {
 		while (i < PARAM_DESCR_BYTE_SIZE) {
 			byte b = byte_descr[i];
 			switch (b) {
+			case (byte) 0x00:
+				byte_descr[i] = (byte) 32; // Replace null character with ascii space 0x20.
+				break;
+			
 			case (byte) 0x80:
 				byte_descr[i] = (byte) 229; // å ISO-8859-1
 				break;
@@ -103,7 +107,7 @@ public class Parameter extends DataPackage {
 				break;
 
 			case (byte) 0x83:
-				byte_descr[i] = (byte) 214; // Ä ISO-8859-1
+				byte_descr[i] = (byte) 214; // Ö ISO-8859-1
 				break;
 
 			}

@@ -37,7 +37,7 @@ public class ConnectAct extends BaseAct {
 	private ToggleButton viewBtnSync;
 
 	private TextView txt;
-	private TextView txt_btmac;
+	private TextView viewBtnSelectBtDevice;
 	private ListPopupWindow btMacPopup;
 
 	private BtServiceListener listener;
@@ -48,7 +48,7 @@ public class ConnectAct extends BaseAct {
 
 		// Get views
 		txt = (TextView) findViewById(id.txt_log);
-		txt_btmac = (TextView) findViewById(id.txt_btmac);
+		viewBtnSelectBtDevice = (Button) findViewById(id.txt_btmac);
 		viewForceMeter = (Meter) findViewById(id.force_meter);
 		viewTempDigits = (Digits) findViewById(id.temperature);
 		viewDrumDigits = (Digits) findViewById(id.drum_spd);
@@ -60,7 +60,7 @@ public class ConnectAct extends BaseAct {
 
 		// Arrange popup for selecting bt mac address
 		btMacPopup = new ListPopupWindow(this);
-		btMacPopup.setAnchorView(txt_btmac);
+		btMacPopup.setAnchorView(viewBtnSelectBtDevice);
 		btMacPopup.setModal(true);
 		btMacPopup.setAdapter(getPairedBtList());
 		btMacPopup.setOnItemClickListener(new OnItemClickListener() {
@@ -72,14 +72,14 @@ public class ConnectAct extends BaseAct {
 						.getItem(position);
 				String adr = dev.getAddress();
 				String name = dev.getName();
-				txt_btmac.setText("Enhet: " + name + " - " + adr);
+				viewBtnSelectBtDevice.setText("Enhet: " + name + " - " + adr);
 				btService.setBtMac(adr);
 				btMacPopup.dismiss();
 			}
 		});
 
 		// Connect click listeners
-		txt_btmac.setOnClickListener(onBtMacClicked);
+		viewBtnSelectBtDevice.setOnClickListener(onBtMacClicked);
 		viewBtnConnect.setOnClickListener(on.clickConnectBtn);
 		viewBtnSample.setOnClickListener(on.clickSampleBtn); // setOnClickListener(onClickSampleBtn);
 		viewBtnSync.setOnClickListener(on.clickSyncBtn);

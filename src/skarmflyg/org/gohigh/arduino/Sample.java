@@ -9,7 +9,7 @@ import java.util.Arrays;
  * @author markus
  */
 public class Sample extends DataPackage {
-	static final public byte BYTE_SIZE = 11;
+	static final public byte BYTE_SIZE = 12;
 
 	// Indices of parameters used for mapping.
 	static final public byte PARAM_INDEX_DRUM = 0;
@@ -20,6 +20,7 @@ public class Sample extends DataPackage {
 
 	// public short index;
 	public long time;
+	public short errors;
 	public short tach_pump;
 	public short tach_drum;
 	public short temp;
@@ -42,6 +43,7 @@ public class Sample extends DataPackage {
 		raw = Arrays.copyOf(bytearr, BYTE_SIZE);
 		mode = getMode(raw);
 		time = getTime(raw);
+		errors = getErrors(raw);
 		tach_pump = getTachPump(raw);
 		tach_drum = getTachDrum(raw);
 		temp = getTemp(raw);
@@ -56,36 +58,40 @@ public class Sample extends DataPackage {
 		return byte2long(raw[1], raw[2], raw[3], raw[4]);
 	}
 
-	static public short getTachPump(byte[] raw) {
+	static public short getErrors(byte[] raw) {
 		return byte2short(raw[5]);
 	}
 
-	static public short getTachDrum(byte[] raw) {
+	static public short getTachPump(byte[] raw) {
 		return byte2short(raw[6]);
 	}
 
+	static public short getTachDrum(byte[] raw) {
+		return byte2short(raw[7]);
+	}
+
 	static public short getTemp(byte[] raw) {
-		return byte2short(raw[7], raw[8]);
+		return byte2short(raw[8], raw[9]);
 	}
 
 	static public short getPres(byte[] raw) {
-		return byte2short(raw[9], raw[10]);
+		return byte2short(raw[10], raw[11]);
 	}
 
 	@Override
 	public String toString() {
-		String format = "mode : %d\ntime : %d\npump : %d\ndrum : %d\ntemp : %d\npres : %d\n";
-		return String.format(format, mode.getByte(), time, tach_pump,
+		String format = "mode : %d\nerrors : %8s\ntime : %d\npump : %d\ndrum : %d\ntemp : %d\npres : %d\n";
+		return String.format(format, mode.getByte(), Integer.toBinaryString(errors & 0xFF), time, tach_pump,
 				tach_drum, temp, pres);
 	}
 
 	static public String csvHeaders() {
-		return "mode,time,pump_speed_raw,drum_speed_raw,temp,pres\n";
+		return "time,mode,errors,pump_speed_raw,drum_speed_raw,temp,pres\n";
 	}
 
 	public String toCsv() {
-		String format = "%d,%d,%d,%d,%d,%d\n";
-		return String.format(format, time, mode.getByte(), tach_pump,
+		String format = "%d,%d,%d,%d,%d,%d,%d\n";
+		return String.format(format, time, mode.getByte(), errors, tach_pump,
 				tach_drum, temp, pres);
 	}
 

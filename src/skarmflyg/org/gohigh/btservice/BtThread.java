@@ -95,7 +95,8 @@ public class BtThread extends HandlerThread {
 	 */
 	static class WorkerHandler extends Handler {
 		// Change MAC-address here! ***
-		private String BT_MAC = "00:06:66:43:07:C0";
+		//private String BT_MAC = "00:06:66:43:07:C0";
+		private String BT_MAC = "00:06:66:43:11:8D";
 		// Bluetooth timeout in milliseconds.
 		final private int BT_PACKAGE_TIMEOUT = 1000;
 		// Bluetooth period of reads in milliseconds.
