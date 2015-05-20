@@ -25,6 +25,7 @@ public class SampleAct extends BaseAct {
 	private BtServiceListener listener;
 	private SampleXYSeries drumSeries;
 	private SampleXYSeries pumpSeries;
+	private SampleXYSeries engineSeries;
 	private SampleXYSeries tempSeries;
 
 	@Override
@@ -56,6 +57,7 @@ public class SampleAct extends BaseAct {
 		SampleStore sampel_data = btService.getSampleStore();
 		drumSeries = sampel_data.getXYSeriesDrum();
 		pumpSeries = sampel_data.getXYSeriesPump();
+		engineSeries = sampel_data.getXYSeriesEngine();
 		tempSeries = sampel_data.getXYSeriesTemp();
 
 		// Add series to plot
@@ -68,6 +70,11 @@ public class SampleAct extends BaseAct {
 		pumpFormat.configure(getApplicationContext(), R.xml.plf);
 		pumpFormat.getLinePaint().setColor(Color.GREEN);
 		dynamicPlot.addSeries(pumpSeries, pumpFormat);
+
+		LineAndPointFormatter engineFormat = new LineAndPointFormatter();
+		engineFormat.configure(getApplicationContext(), R.xml.plf);
+		engineFormat.getLinePaint().setColor(Color.YELLOW);
+		dynamicPlot.addSeries(engineSeries, engineFormat);
 
 		LineAndPointFormatter tempFormat = new LineAndPointFormatter();
 		tempFormat.configure(getApplicationContext(), R.xml.plf);

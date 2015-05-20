@@ -9,7 +9,7 @@ import java.util.Arrays;
  * @author markus
  */
 public class Sample extends DataPackage {
-	static final public byte BYTE_SIZE = 12;
+	static final public byte BYTE_SIZE = 13;
 
 	// Indices of parameters used for mapping.
 	static final public byte PARAM_INDEX_DRUM = 0;
@@ -23,6 +23,7 @@ public class Sample extends DataPackage {
 	public short errors;
 	public short tach_pump;
 	public short tach_drum;
+	public short tach_engine;
 	public short temp;
 	public short pres;
 
@@ -46,6 +47,7 @@ public class Sample extends DataPackage {
 		errors = getErrors(raw);
 		tach_pump = getTachPump(raw);
 		tach_drum = getTachDrum(raw);
+		tach_engine = getTachEngine(raw);
 		temp = getTemp(raw);
 		pres = getPres(raw);
 	}
@@ -70,29 +72,33 @@ public class Sample extends DataPackage {
 		return byte2short(raw[7]);
 	}
 
+	static public short getTachEngine(byte[] raw) {
+		return byte2short(raw[8]);
+	}
+	
 	static public short getTemp(byte[] raw) {
-		return byte2short(raw[8], raw[9]);
+		return byte2short(raw[9], raw[10]);
 	}
 
 	static public short getPres(byte[] raw) {
-		return byte2short(raw[10], raw[11]);
+		return byte2short(raw[11], raw[12]);
 	}
 
 	@Override
 	public String toString() {
-		String format = "mode : %d\nerrors : %8s\ntime : %d\npump : %d\ndrum : %d\ntemp : %d\npres : %d\n";
+		String format = "mode : %d\nerrors : %8s\ntime : %d\npump : %d\ndrum : %d\nengine : %d\ntemp : %d\npres : %d\n";
 		return String.format(format, mode.getByte(), Integer.toBinaryString(errors & 0xFF), time, tach_pump,
-				tach_drum, temp, pres);
+				tach_drum, tach_engine, temp, pres);
 	}
 
 	static public String csvHeaders() {
-		return "time,mode,errors,pump_speed_raw,drum_speed_raw,temp,pres\n";
+		return "time,mode,errors,pump_speed,drum_speed,engine_speed,temp,pres\n";
 	}
 
 	public String toCsv() {
-		String format = "%d,%d,%d,%d,%d,%d,%d\n";
+		String format = "%d,%d,%d,%d,%d,%d,%d,%d\n";
 		return String.format(format, time, mode.getByte(), errors, tach_pump,
-				tach_drum, temp, pres);
+				tach_drum, tach_engine, temp, pres);
 	}
 
 }

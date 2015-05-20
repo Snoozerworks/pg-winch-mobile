@@ -14,6 +14,7 @@ public class SampleStore {
 
 	private Parameter param_drum;
 	private Parameter param_pump;
+	private Mapping   mapping_engine;
 	private Parameter param_temp;
 	private Parameter param_oil_lo;
 
@@ -36,6 +37,8 @@ public class SampleStore {
 		param_temp = new Parameter(Sample.PARAM_INDEX_TEMP_HI);
 		param_oil_lo = new Parameter(Sample.PARAM_INDEX_TEMP_LO);
 
+		mapping_engine = new Mapping(0,255,0,255);
+		
 		parameters.put(param_drum);
 		parameters.put(param_pump);
 		parameters.put(param_temp);
@@ -104,6 +107,15 @@ public class SampleStore {
 			@Override
 			public Number getY(int arg0) {
 				return map(samples_arr[getPos(arg0)].tach_pump);
+			}
+		};
+	}
+
+	public SampleXYSeries getXYSeriesEngine() {
+		return new SampleXYSeries("Engine spd", mapping_engine) {
+			@Override
+			public Number getY(int arg0) {
+				return map(samples_arr[getPos(arg0)].tach_engine);
 			}
 		};
 	}
